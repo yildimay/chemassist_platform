@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import difflib
+HISTORY_CSV = "user_history.csv"
 
 st.title("⚛️ Gaussian Error Fixer + GJF Generator")
 
