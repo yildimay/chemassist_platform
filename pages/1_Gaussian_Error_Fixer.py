@@ -163,3 +163,12 @@ Output only the corrected .gjf file (no explanation), with proper route section,
                 st.info("GJF generation failed — please try again later.")
         else:
             st.info("Upgrade to a paid plan to unlock .gjf file generation.")
+st.divider()
+if st.checkbox("📜 Show my query history"):
+    if os.path.exists(HISTORY_CSV):
+        df = pd.read_csv(HISTORY_CSV)
+        user_df = df[df["user_email"] == user_email].sort_values("timestamp", ascending=False)
+        st.write("### Your Past Queries:")
+        st.dataframe(user_df[["timestamp", "query_type", "status"]], use_container_width=True)
+    else:
+        st.info("No history found yet.")
