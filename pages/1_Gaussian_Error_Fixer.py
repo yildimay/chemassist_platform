@@ -82,7 +82,7 @@ test_log = """ Initial command:
  Error termination via Lnk1e in /g16/l101.exe
 """
 
-# File upload section
+# File input
 gjf_content = ""
 log_content = ""
 
@@ -106,10 +106,16 @@ if st.button("Analyze / Fix"):
 
 A user submitted this Gaussian input file and log file.
 
-Explain:
-1. What is wrong
-2. Why it likely happened
-3. How they can fix it manually
+Separate your response into 3 sections:
+
+### 🔍 Problem:
+(Explain what's wrong)
+
+### ❓ Why It Happens:
+(Explain the likely cause)
+
+### 🛠 How to Fix:
+(Explain how to resolve it manually)
 
 -- .gjf file --
 {gjf_content}
@@ -121,6 +127,7 @@ Explain:
         if explanation:
             st.subheader("📘 Explanation & Suggested Fix")
             st.markdown(explanation)
+            st.download_button("📄 Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
         else:
             st.info("Something went wrong — please try again shortly.")
 
