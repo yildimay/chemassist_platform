@@ -179,3 +179,19 @@ if st.checkbox("📜 Show my query history"):
         st.dataframe(user_df[["timestamp", "query_type", "status"]], use_container_width=True)
     else:
         st.info("No history found yet.")
+if not gjf_content or not log_content:
+    st.warning("Missing required input files. You can still describe your problem manually.")
+    manual_prompt = st.text_area("📝 Describe your issue or paste a partial input file here:")
+
+    if st.button("Analyze Manually"):
+        if not manual_prompt.strip():
+            st.warning("Please write something first.")
+        else:
+            with st.spinner("Analyzing..."):
+                explanation = call_groq(manual_prompt, EXPLAIN_MODEL)
+                if explanation:
+                    st.subheader("📘 Explanation")
+                    st.markdown(explanation)
+                    st.download_button("📄 Download Explanation", explanation, file_name="manual_explanation.txt", mime="text/plain")
+                else:
+                    st.info("Something went wrong — try again.")
