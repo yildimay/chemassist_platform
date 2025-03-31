@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import difflib
 
 st.title("⚛️ Gaussian Error Fixer + GJF Generator")
 
@@ -50,6 +51,12 @@ def call_groq(prompt, model):
     except Exception as e:
         st.error(f"⚠️ Unexpected error: {e}")
         return None
+
+def generate_diff(original, fixed):
+    original_lines = original.strip().splitlines()
+    fixed_lines = fixed.strip().splitlines()
+    diff = difflib.unified_diff(original_lines, fixed_lines, lineterm="", fromfile="original.gjf", tofile="fixed.gjf")
+    return "\n".join(diff)
 
 # Built-in test content
 test_gjf = """%chk=broken.chk
@@ -148,6 +155,10 @@ Output only the corrected .gjf file (no explanation), with proper route section,
                 st.subheader("✅ Fixed .gjf File")
                 st.code(fixed_gjf, language="text")
                 st.download_button("💾 Download Fixed .gjf", fixed_gjf, file_name="fixed_input.gjf", mime="text/plain")
+
+                diff_result = generate_diff(gjf_content, fixed_gjf)
+                st.subheader("🔍 Difference (Original vs Fixed)")
+                st.code(diff_result, language="diff")
             else:
                 st.info("GJF generation failed — please try again later.")
         else:
