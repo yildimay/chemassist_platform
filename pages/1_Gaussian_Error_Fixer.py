@@ -16,6 +16,11 @@ is_paid = st.checkbox("I'm a paid user", value=False)
 if not user_email:
     st.stop()
 
+st.divider()
+st.subheader("🧪 File Input")
+
+use_test_mode = st.checkbox("Use built-in sample files (for testing)", value=False)
+
 def read_uploaded_file(file):
     return file.read().decode("utf-8", errors="ignore")
 
@@ -46,18 +51,57 @@ def call_groq(prompt, model):
         st.error(f"⚠️ Unexpected error: {e}")
         return None
 
-gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
-log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
+# Built-in test content
+test_gjf = """%chk=broken.chk
 
-if st.button("Analyze / Fix"):
-    if not gjf_file or not log_file:
-        st.warning("Please upload both a .gjf and a .log/.out file.")
-        st.stop()
+Gaussian Broken Job
 
-    with st.spinner("Processing..."):
+0 1
+C       0.000000    0.000000    0.000000
+H       0.000000    0.000000    1.089000
+H       1.026719    0.000000   -0.363000
+H      -0.513360   -0.889165   -0.363000
+H      -0.513360    0.889165   -0.363000
+"""
+
+test_log = """ Initial command:
+ %chk=broken.chk
+ #p B3LYP/6-31G(d) opt freq
+
+ Gaussian Test Job
+
+ 0 1
+ C 0.000000 0.000000 0.000000
+ H 0.000000 0.000000 1.089000
+ H 1.026719 0.000000 -0.363000
+ H -0.513360 -0.889165 -0.363000
+ H -0.513360 0.889165 -0.363000
+
+ Optimization failed to converge
+ Displacement too small, but forces too large
+ Error termination via Lnk1e in /g16/l101.exe
+"""
+
+# File upload section
+gjf_content = ""
+log_content = ""
+
+if use_test_mode:
+    gjf_content = test_gjf
+    log_content = test_log
+else:
+    gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
+    log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
+    if gjf_file and log_file:
         gjf_content = read_uploaded_file(gjf_file)
         log_content = read_uploaded_file(log_file)
 
+if st.button("Analyze / Fix"):
+    if not gjf_content or not log_content:
+        st.warning("Missing required input files.")
+        st.stop()
+
+    with st.spinner("Processing..."):
         explain_prompt = f"""You're a Gaussian error expert.
 
 A user submitted this Gaussian input file and log file.
