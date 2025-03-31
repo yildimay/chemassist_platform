@@ -1,17 +1,21 @@
 import streamlit as st
 import requests
 import difflib
-
+import hashlib
+import pandas as pd
+from datetime import datetime
+import os
 
 st.title("⚛️ Gaussian Error Fixer + GJF Generator")
 
+# ✅ 👇 THIS IS THE MODULE SETUP 👇 ✅
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 EXPLAIN_MODEL = "llama3-8b-8192"
 FIX_MODEL = "llama3-70b-8192"
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 
+# ✅ ADD THIS LINE RIGHT BELOW:
 HISTORY_CSV = "user_history.csv"
-
 # Login and tier selection
 st.subheader("🔐 Login")
 user_email = st.text_input("Enter your email:")
