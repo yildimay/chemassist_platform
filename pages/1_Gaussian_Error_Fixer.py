@@ -34,8 +34,17 @@ def call_groq(prompt, model):
         res = requests.post(GROQ_API_URL, headers=headers, json=data)
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.HTTPError as e:
+        if res.status_code == 401:
+            st.error("🔐 Unauthorized: Check your GROQ_API_KEY.")
+        elif res.status_code == 429:
+            st.error("🚫 Quota exceeded: You've hit the Groq usage limit. Try again later.")
+        else:
+            st.error(f"❌ HTTP error {res.status_code}: {res.text}")
+        return None
     except Exception as e:
-        return f"Error calling {model}: {e}"
+        st.error(f"⚠️ Unexpected error: {e}")
+        return None
 
 gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
 log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
