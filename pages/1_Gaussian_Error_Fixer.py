@@ -58,7 +58,6 @@ if st.button("Analyze / Fix"):
         gjf_content = read_uploaded_file(gjf_file)
         log_content = read_uploaded_file(log_file)
 
-        # Always show explanation
         explain_prompt = f"""You're a Gaussian error expert.
 
 A user submitted this Gaussian input file and log file.
@@ -75,10 +74,12 @@ Explain:
 {log_content}
 """
         explanation = call_groq(explain_prompt, EXPLAIN_MODEL)
-        st.subheader("📘 Explanation & Suggested Fix")
-        st.markdown(explanation)
+        if explanation:
+            st.subheader("📘 Explanation & Suggested Fix")
+            st.markdown(explanation)
+        else:
+            st.info("Something went wrong — please try again shortly.")
 
-        # Only paid users get fixed .gjf
         if is_paid:
             fix_prompt = f"""You are an expert in Gaussian input files.
 
@@ -92,8 +93,11 @@ Output only the corrected .gjf file (no explanation), with proper route section,
 {log_content}
 """
             fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
-            st.subheader("✅ Fixed .gjf File")
-            st.code(fixed_gjf, language="text")
-            st.download_button("💾 Download Fixed .gjf", fixed_gjf, file_name="fixed_input.gjf", mime="text/plain")
+            if fixed_gjf:
+                st.subheader("✅ Fixed .gjf File")
+                st.code(fixed_gjf, language="text")
+                st.download_button("💾 Download Fixed .gjf", fixed_gjf, file_name="fixed_input.gjf", mime="text/plain")
+            else:
+                st.info("GJF generation failed — please try again later.")
         else:
             st.info("Upgrade to a paid plan to unlock .gjf file generation.")
