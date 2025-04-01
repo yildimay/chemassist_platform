@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import difflib
+import pytesseract
 from PIL import Image
 import pytesseract
 
