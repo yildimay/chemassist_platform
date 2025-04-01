@@ -145,7 +145,70 @@ if st.button("🧠 Explain Manually"):
         st.warning("Please enter something first.")
     else:
         with st.spinner("Thinking..."):
-            result = call_groq(manual_prompt, EXPLAIN_MODEL)
+            manual_wrap_prompt = f"""You're a professional Gaussian and quantum chemistry troubleshooting assistant.
+
+A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
+
+Analyze their message as if it's part of a Gaussian calculation issue.
+
+Respond with:
+
+### 🔍 Problem  
+(Explain what might be wrong)  
+
+### ❓ Why It Happens  
+(Possible cause)  
+
+### 🛠 How to Fix  
+(How to solve or debug it)
+
+-- User message --
+{manual_prompt}
+"""
+
+result = call_groq(manual_wrap_prompt, EXPLAIN_MODEL)manual_wrap_prompt = f"""You're a professional Gaussian and quantum chemistry troubleshooting assistant.
+
+A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
+
+Analyze their message as if it's part of a Gaussian calculation issue.
+
+Respond with:
+
+### 🔍 Problem  
+(Explain what might be wrong)  
+
+### ❓ Why It Happens  
+(Possible cause)  
+
+### 🛠 How to Fix  
+(How to solve or debug it)
+
+-- User message --
+{manual_prompt}
+"""
+
+manual_wrap_prompt = f"""You're a professional Gaussian and quantum chemistry troubleshooting assistant.
+
+A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
+
+Analyze their message as if it's part of a Gaussian calculation issue.
+
+Respond with:
+
+### 🔍 Problem  
+(Explain what might be wrong)  
+
+### ❓ Why It Happens  
+(Possible cause)  
+
+### 🛠 How to Fix  
+(How to solve or debug it)
+
+-- User message --
+{manual_prompt}
+"""
+
+result = call_groq(manual_wrap_prompt, EXPLAIN_MODEL)
             if result:
                 st.subheader("📘 Explanation")
                 st.markdown(result)
