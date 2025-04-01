@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: gaussian-error-fixer
-    env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
