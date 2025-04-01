@@ -13,4 +13,5 @@ COPY . /app
 
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-CMD ["streamlit", "run", "app.py", "--server.port=8000", "--server.enableCORS=false"]
+# ✅ This picks up Render’s dynamic port
+CMD streamlit run app.py --server.port=$PORT --server.enableCORS=false
