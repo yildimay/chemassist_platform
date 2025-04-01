@@ -136,6 +136,7 @@ Fix the broken .gjf file using info from the log. Output only the corrected .gjf
         else:
             st.info("Couldn't generate fixed .gjf.")
 
+# Chat fallback
 st.divider()
 st.subheader("💬 No files? Describe your issue here:")
 manual_prompt = st.text_area("Type your problem or paste part of a Gaussian input file")
@@ -149,66 +150,22 @@ if st.button("🧠 Explain Manually"):
 
 A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
 
-Analyze their message as if it's part of a Gaussian calculation issue.
+Analyze their message as if it's part of a Gaussian-related issue.
 
 Respond with:
 
 ### 🔍 Problem  
-(Explain what might be wrong)  
-
 ### ❓ Why It Happens  
-(Possible cause)  
+### 🛠 How to Fix
 
-### 🛠 How to Fix  
-(How to solve or debug it)
+If the message is unrelated to Gaussian or computational chemistry, say:
+
+"This tool is for fixing Gaussian input/log file issues. Please provide a chemistry-related problem so I can help."
 
 -- User message --
 {manual_prompt}
 """
-
-result = call_groq(manual_wrap_prompt, EXPLAIN_MODEL)manual_wrap_prompt = f"""You're a professional Gaussian and quantum chemistry troubleshooting assistant.
-
-A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
-
-Analyze their message as if it's part of a Gaussian calculation issue.
-
-Respond with:
-
-### 🔍 Problem  
-(Explain what might be wrong)  
-
-### ❓ Why It Happens  
-(Possible cause)  
-
-### 🛠 How to Fix  
-(How to solve or debug it)
-
--- User message --
-{manual_prompt}
-"""
-
-manual_wrap_prompt = f"""You're a professional Gaussian and quantum chemistry troubleshooting assistant.
-
-A user is describing a problem they're having with a Gaussian input file, a quantum chemistry job, or an error message.
-
-Analyze their message as if it's part of a Gaussian calculation issue.
-
-Respond with:
-
-### 🔍 Problem  
-(Explain what might be wrong)  
-
-### ❓ Why It Happens  
-(Possible cause)  
-
-### 🛠 How to Fix  
-(How to solve or debug it)
-
--- User message --
-{manual_prompt}
-"""
-
-result = call_groq(manual_wrap_prompt, EXPLAIN_MODEL)
+            result = call_groq(manual_wrap_prompt, EXPLAIN_MODEL)
             if result:
                 st.subheader("📘 Explanation")
                 st.markdown(result)
