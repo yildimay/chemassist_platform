@@ -1,90 +1,94 @@
-Gaussian Refine Retry
-92
-93
-94
-95
-96
-97
-98
-99
-100
-101
-102
-103
-104
-105
-106
-107
-108
-109
-110
-111
-112
-113
-114
-115
-116
-117
-118
-119
-120
-121
-122
-123
-124
-125
-126
-127
-128
-129
-130
-131
-132
-133
-134
-135
-136
-137
-138
-139
-140
-141
-142
-143
-144
-145
-146
-147
-148
-149
-150
-151
-152
-153
-154
-155
-156
-157
-158
-159
-160
-161
-162
-163
-164
-165
-166
-167
-168
-169
-170
-171
-172
-173
-174
-175
-176
-177
+import streamlit as st
+import requests
+import difflib
+
+st.set_page_config(page_title="Gaussian Fixer", layout="centered")
+
+# === Custom CSS ===
+st.markdown("""
+<style>
+.stApp {
+    background-color: #0f0f0f;
+    padding: 2rem;
+}
+h1 {
+    color: #5B8DEE;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin-bottom: 1.2rem;
+}
+h2, h3 {
+    color: #ffffff;
+    margin-top: 1.5rem;
+    font-weight: 600;
+}
+div[data-testid="stMarkdownContainer"] p {
+    font-size: 1.05rem;
+    color: #cccccc;
+}
+.stButton > button {
+    background-color: #5B8DEE;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: bold;
+    border: none;
+    transition: 0.3s ease;
+}
+.stButton > button:hover {
+    background-color: #3A68D8;
+    transform: scale(1.02);
+}
+.stTextInput input, textarea {
+    background-color: #1f1f1f;
+    color: #eee;
+    border-radius: 8px;
+}
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# === Title ===
+st.markdown("<h1>\ud83d\ude80 Gaussian Error Fixer <span style='color:#aaa'>\u2014 Free. Anonymous. Clean AF.</span></h1>", unsafe_allow_html=True)
+
+# === Config ===
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+EXPLAIN_MODEL = "llama3-8b-8192"
+FIX_MODEL = "llama3-70b-8192"
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+
+def read_uploaded_file(file):
+    return file.read().decode("utf-8", errors="ignore")
+
+def call_groq(prompt, model):
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 900,
+        "temperature": 0.3
+    }
+    try:
+        res = requests.post(GROQ_API_URL, headers=headers, json=data)
+        res.raise_for_status()
+        return res.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        st.error(f"\u274c Error: {e}")
+        return None
+
+def generate_diff(original, fixed):
+    original_lines = original.strip().splitlines()
+    fixed_lines = fixed.strip().splitlines()
+    return "\n".join(difflib.unified_diff(original_lines, fixed_lines, fromfile="original.gjf", tofile="fixed.gjf", lineterm=""))
+
+# === Test Data ===
+test_gjf = "%chk=broken.chk\n\nGaussian Broken Job\n\n0 1\nC       0.000000    0.000000    0.000000\nH       0.000000    0.000000    1.089000\nH       1.026719    0.000000   -0.363000\nH      -0.513360   -0.889165   -0.363000\nH      -0.513360    0.889165   -0.363000"
+
 test_log = """ Optimization failed to converge
  Displacement too small, but forces too large
  Error termination via Lnk1e in /g16/l101.exe
@@ -170,5 +174,3 @@ if st.button("\ud83e\udde0 Manual Explain"):
             st.markdown(result)
     else:
         st.warning("Type something first, bruh.")
-
-
