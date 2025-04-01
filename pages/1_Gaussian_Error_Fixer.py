@@ -1,33 +1,14 @@
 import streamlit as st
 import requests
 import difflib
-import hashlib
-import pandas as pd
-from datetime import datetime
-import os
 
-st.title("⚛️ Gaussian Error Fixer + GJF Generator")
+st.title("⚛️ Gaussian Error Fixer — Free & Anonymous")
 
-# ✅ 👇 THIS IS THE MODULE SETUP 👇 ✅
+# GROQ setup
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 EXPLAIN_MODEL = "llama3-8b-8192"
 FIX_MODEL = "llama3-70b-8192"
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-
-# ✅ ADD THIS LINE RIGHT BELOW:
-HISTORY_CSV = "user_history.csv"
-# Login and tier selection
-st.subheader("🔐 Login")
-user_email = st.text_input("Enter your email:")
-is_paid = st.checkbox("I'm a paid user", value=False)
-
-if not user_email:
-    st.stop()
-
-st.divider()
-st.subheader("🧪 File Input")
-
-use_test_mode = st.checkbox("Use built-in sample files (for testing)", value=False)
 
 def read_uploaded_file(file):
     return file.read().decode("utf-8", errors="ignore")
@@ -47,16 +28,8 @@ def call_groq(prompt, model):
         res = requests.post(GROQ_API_URL, headers=headers, json=data)
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
-    except requests.exceptions.HTTPError as e:
-        if res.status_code == 401:
-            st.error("🔐 Unauthorized: Check your GROQ_API_KEY.")
-        elif res.status_code == 429:
-            st.error("🚫 Quota exceeded: You've hit the Groq usage limit. Try again later.")
-        else:
-            st.error(f"❌ HTTP error {res.status_code}: {res.text}")
-        return None
     except Exception as e:
-        st.error(f"⚠️ Unexpected error: {e}")
+        st.error(f"❌ Error contacting model: {e}")
         return None
 
 def generate_diff(original, fixed):
@@ -65,7 +38,7 @@ def generate_diff(original, fixed):
     diff = difflib.unified_diff(original_lines, fixed_lines, lineterm="", fromfile="original.gjf", tofile="fixed.gjf")
     return "\n".join(diff)
 
-# Built-in test content
+# Built-in sample
 test_gjf = """%chk=broken.chk
 
 Gaussian Broken Job
@@ -96,7 +69,9 @@ test_log = """ Initial command:
  Error termination via Lnk1e in /g16/l101.exe
 """
 
-# File input
+# UI
+st.subheader("🧪 Upload Files")
+use_test_mode = st.checkbox("Use built-in test files")
 gjf_content = ""
 log_content = ""
 
@@ -105,31 +80,27 @@ if use_test_mode:
     log_content = test_log
 else:
     gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
-    log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
+    log_file = st.file_uploader("Upload .log or .out file", type=["log", "out"])
     if gjf_file and log_file:
         gjf_content = read_uploaded_file(gjf_file)
         log_content = read_uploaded_file(log_file)
 
-if st.button("Analyze / Fix"):
+# Main button
+if st.button("🔍 Analyze & Fix"):
     if not gjf_content or not log_content:
-        st.warning("Missing required input files.")
+        st.warning("Missing files. Scroll down to enter your problem manually.")
         st.stop()
 
-    with st.spinner("Processing..."):
-        explain_prompt = f"""You're a Gaussian error expert.
+    with st.spinner("Analyzing the problem..."):
+        explain_prompt = f"""You're a Gaussian expert.
 
-A user submitted this Gaussian input file and log file.
+Analyze the following input and log file.
 
-Separate your response into 3 sections:
+Separate your response into:
 
-### 🔍 Problem:
-(Explain what's wrong)
-
-### ❓ Why It Happens:
-(Explain the likely cause)
-
-### 🛠 How to Fix:
-(Explain how to resolve it manually)
+### 🔍 Problem
+### ❓ Why It Happens
+### 🛠 How to Fix
 
 -- .gjf file --
 {gjf_content}
@@ -139,17 +110,13 @@ Separate your response into 3 sections:
 """
         explanation = call_groq(explain_prompt, EXPLAIN_MODEL)
         if explanation:
-            st.subheader("📘 Explanation & Suggested Fix")
+            st.subheader("📘 Explanation & Fix Suggestion")
             st.markdown(explanation)
             st.download_button("📄 Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
-        else:
-            st.info("Something went wrong — please try again shortly.")
 
-        if is_paid:
-            fix_prompt = f"""You are an expert in Gaussian input files.
+        fix_prompt = f"""You are an expert in Gaussian input files.
 
-Fix the following broken Gaussian input file (.gjf) using information from the log file.
-Output only the corrected .gjf file (no explanation), with proper route section, charge/multiplicity, and fixed atom coordinates.
+Fix the broken .gjf file using info from the log. Output only the corrected .gjf.
 
 -- .gjf file --
 {gjf_content}
@@ -157,41 +124,31 @@ Output only the corrected .gjf file (no explanation), with proper route section,
 -- .log file --
 {log_content}
 """
-            fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
-            if fixed_gjf:
-                st.subheader("✅ Fixed .gjf File")
-                st.code(fixed_gjf, language="text")
-                st.download_button("💾 Download Fixed .gjf", fixed_gjf, file_name="fixed_input.gjf", mime="text/plain")
+        fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
+        if fixed_gjf:
+            st.subheader("✅ Fixed .gjf File")
+            st.code(fixed_gjf, language="text")
+            st.download_button("💾 Download Fixed .gjf", fixed_gjf, file_name="fixed_input.gjf", mime="text/plain")
 
-                diff_result = generate_diff(gjf_content, fixed_gjf)
-                st.subheader("🔍 Difference (Original vs Fixed)")
-                st.code(diff_result, language="diff")
-            else:
-                st.info("GJF generation failed — please try again later.")
+            diff = generate_diff(gjf_content, fixed_gjf)
+            st.subheader("🔍 Difference")
+            st.code(diff, language="diff")
         else:
-            st.info("Upgrade to a paid plan to unlock .gjf file generation.")
+            st.info("Couldn't generate fixed .gjf.")
+
 st.divider()
-if st.checkbox("📜 Show my query history"):
-    if os.path.exists(HISTORY_CSV):
-        df = pd.read_csv(HISTORY_CSV)
-        user_df = df[df["user_email"] == user_email].sort_values("timestamp", ascending=False)
-        st.write("### Your Past Queries:")
-        st.dataframe(user_df[["timestamp", "query_type", "status"]], use_container_width=True)
-    else:
-        st.info("No history found yet.")
-if not gjf_content or not log_content:
-    st.warning("Missing required input files. You can still describe your problem manually.")
-    manual_prompt = st.text_area("📝 Describe your issue or paste a partial input file here:")
+st.subheader("💬 No files? Describe your issue here:")
+manual_prompt = st.text_area("Type your problem or paste part of a Gaussian input file")
 
-    if st.button("Analyze Manually"):
-        if not manual_prompt.strip():
-            st.warning("Please write something first.")
-        else:
-            with st.spinner("Analyzing..."):
-                explanation = call_groq(manual_prompt, EXPLAIN_MODEL)
-                if explanation:
-                    st.subheader("📘 Explanation")
-                    st.markdown(explanation)
-                    st.download_button("📄 Download Explanation", explanation, file_name="manual_explanation.txt", mime="text/plain")
-                else:
-                    st.info("Something went wrong — try again.")
+if st.button("🧠 Explain Manually"):
+    if not manual_prompt.strip():
+        st.warning("Please enter something first.")
+    else:
+        with st.spinner("Thinking..."):
+            result = call_groq(manual_prompt, EXPLAIN_MODEL)
+            if result:
+                st.subheader("📘 Explanation")
+                st.markdown(result)
+                st.download_button("📄 Download Explanation", result, file_name="manual_explanation.txt", mime="text/plain")
+            else:
+                st.error("Couldn’t analyze the input.")
