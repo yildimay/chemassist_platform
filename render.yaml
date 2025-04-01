@@ -1,13 +1,6 @@
 services:
   - type: web
     name: gaussian-error-fixer
-    env: python
-    region: oregon
+    env: docker
     plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y tesseract-ocr
-      pip install -r requirements.txt
-    startCommand: streamlit run app.py
-    envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
+    dockerfilePath: ./Dockerfile
