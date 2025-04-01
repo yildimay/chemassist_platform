@@ -4,6 +4,10 @@ import difflib
 
 st.set_page_config(page_title="Gaussian Fixer", layout="centered")
 
+# === Init session state for prompts ===
+if "fix_prompt" not in st.session_state:
+    st.session_state.fix_prompt = ""
+
 # === Custom CSS ===
 st.markdown("""
 <style>
@@ -122,6 +126,7 @@ if st.button("🔍 Analyze & Fix"):
         st.download_button("📄 Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
 
         fix_prompt = f"""Fix the broken Gaussian .gjf using the .log info.\nOnly return a valid, fixed .gjf file.\n\n-- .gjf --\n{gjf_content}\n\n-- .log --\n{log_content}"""
+        st.session_state.fix_prompt = fix_prompt
         fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
         if fixed_gjf:
             st.subheader("✅ Fixed .gjf File")
@@ -130,36 +135,37 @@ if st.button("🔍 Analyze & Fix"):
             st.subheader("🔍 Difference")
             st.code(generate_diff(gjf_content, fixed_gjf), language="diff")
 
-            # === Retry / Refine Options ===
-            st.subheader("🔁 Refine or Retry Fix")
-            col1, col2, col3 = st.columns(3)
+# === Retry / Refine Options ===
+if st.session_state.fix_prompt:
+    st.subheader("🔁 Refine or Retry Fix")
+    col1, col2, col3 = st.columns(3)
 
-            with col1:
-                if st.button("🔬 Tighten Optimization"):
-                    refine_prompt = fix_prompt + "\n\nPlease tighten geometry optimization settings if possible (e.g., tighter convergence or opt=tight)."
-                    refined = call_groq(refine_prompt, FIX_MODEL)
-                    if refined:
-                        st.subheader("🔧 Refined .gjf (Tighter Opt)")
-                        st.code(refined, language="text")
-                        st.download_button("💾 Download Refined .gjf", refined, file_name="refined_opt.gjf", mime="text/plain")
+    with col1:
+        if st.button("🔬 Tighten Optimization"):
+            refine_prompt = st.session_state.fix_prompt + "\n\nPlease tighten geometry optimization settings if possible."
+            refined = call_groq(refine_prompt, FIX_MODEL)
+            if refined:
+                st.subheader("🔧 Refined .gjf (Tighter Opt)")
+                st.code(refined, language="text")
+                st.download_button("💾 Download Refined .gjf", refined, file_name="refined_opt.gjf", mime="text/plain")
 
-            with col2:
-                if st.button("🚀 Increase Memory/CPUs"):
-                    memory_prompt = fix_prompt + "\n\nPlease increase memory and processor count if current job settings are low."
-                    refined = call_groq(memory_prompt, FIX_MODEL)
-                    if refined:
-                        st.subheader("🔧 More Resources .gjf")
-                        st.code(refined, language="text")
-                        st.download_button("💾 Download More Resources .gjf", refined, file_name="more_resources.gjf", mime="text/plain")
+    with col2:
+        if st.button("🚀 Increase Memory/CPUs"):
+            memory_prompt = st.session_state.fix_prompt + "\n\nPlease increase memory and processor count."
+            refined = call_groq(memory_prompt, FIX_MODEL)
+            if refined:
+                st.subheader("🔧 More Resources .gjf")
+                st.code(refined, language="text")
+                st.download_button("💾 Download More Resources .gjf", refined, file_name="more_resources.gjf", mime="text/plain")
 
-            with col3:
-                if st.button("🧪 Alternate Method"):
-                    retry_prompt = fix_prompt + "\n\nTry using a different method or functional to improve stability (e.g., switch from B3LYP to M06)."
-                    refined = call_groq(retry_prompt, FIX_MODEL)
-                    if refined:
-                        st.subheader("🔧 Alternate Method .gjf")
-                        st.code(refined, language="text")
-                        st.download_button("💾 Download Alternate .gjf", refined, file_name="alternate_method.gjf", mime="text/plain")
+    with col3:
+        if st.button("🧪 Alternate Method"):
+            retry_prompt = st.session_state.fix_prompt + "\n\nTry a different method/functional for better stability."
+            refined = call_groq(retry_prompt, FIX_MODEL)
+            if refined:
+                st.subheader("🔧 Alternate Method .gjf")
+                st.code(refined, language="text")
+                st.download_button("💾 Download Alternate .gjf", refined, file_name="alternate_method.gjf", mime="text/plain")
 
 # === Manual Fallback ===
 st.divider()
