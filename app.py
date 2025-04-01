@@ -5,6 +5,8 @@ import base64
 from PIL import Image
 import os
 
+st.set_page_config(page_title="Gaussian Error Assistant", layout="centered")
+
 # 🧠 AI model toggle (sidebar)
 st.sidebar.subheader("🧠 AI Model Settings")
 use_gpt4 = st.sidebar.checkbox("Use GPT-4 (OpenAI)", value=False)
@@ -17,8 +19,6 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 EXPLAIN_MODEL = "llama3-8b-8192"
 FIX_MODEL = "llama3-70b-8192"
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-
-st.set_page_config(page_title="Gaussian Error Assistant", layout="centered")
 
 # === Init session ===
 if "fix_prompt" not in st.session_state:
