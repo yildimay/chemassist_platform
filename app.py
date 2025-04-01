@@ -1,9 +1,9 @@
 import streamlit as st
 import requests
 import difflib
-import pytesseract
 from PIL import Image
 import pytesseract
+pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 st.set_page_config(page_title="Gaussian Error Assistant", layout="centered")
 
