@@ -51,7 +51,7 @@ header {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # === Title ===
-st.markdown("<h1>\ud83d\ude80 Gaussian Error Fixer <span style='color:#aaa'>\u2014 Free. Anonymous. Clean AF.</span></h1>", unsafe_allow_html=True)
+st.markdown("""<h1>&#128640; Gaussian Error Fixer <span style='color:#aaa'>— Free. Anonymous. Clean AF.</span></h1>""", unsafe_allow_html=True)
 
 # === Config ===
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -78,7 +78,7 @@ def call_groq(prompt, model):
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        st.error(f"\u274c Error: {e}")
+        st.error(f"❌ Error: {e}")
         return None
 
 def generate_diff(original, fixed):
@@ -95,7 +95,7 @@ test_log = """ Optimization failed to converge
 """
 
 # === Upload UI ===
-st.subheader("\ud83e\uddea Upload Files")
+st.subheader("🧪 Upload Files")
 use_test = st.checkbox("Use built-in test files")
 gjf_content, log_content = "", ""
 
@@ -109,67 +109,67 @@ else:
     if log_file: log_content = read_uploaded_file(log_file)
 
 # === Analyze & Fix ===
-if st.button("\ud83d\udd0d Analyze & Fix"):
+if st.button("🔍 Analyze & Fix"):
     if not gjf_content or not log_content:
         st.warning("Missing files. Scroll down to enter your problem manually.")
         st.stop()
 
     with st.spinner("Analyzing..."):
-        explain_prompt = f"""You're a Gaussian expert.\n\nAnalyze the input and log file. Format your answer as:\n\n### \ud83d\udd0d Problem\n### \u2753 Why It Happens\n### \ud83d\udee0 How to Fix\n\n-- .gjf --\n{gjf_content}\n\n-- .log --\n{log_content}"""
+        explain_prompt = f"""You're a Gaussian expert.\n\nAnalyze the input and log file. Format your answer as:\n\n### 🔍 Problem\n### ❓ Why It Happens\n### 🛠 How to Fix\n\n-- .gjf --\n{gjf_content}\n\n-- .log --\n{log_content}"""
         explanation = call_groq(explain_prompt, EXPLAIN_MODEL)
-        st.subheader("\ud83d\udcd8 Explanation")
+        st.subheader("📘 Explanation")
         st.markdown(explanation)
-        st.download_button("\ud83d\udcc4 Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
+        st.download_button("📄 Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
 
         fix_prompt = f"""Fix the broken Gaussian .gjf using the .log info.\nOnly return a valid, fixed .gjf file.\n\n-- .gjf --\n{gjf_content}\n\n-- .log --\n{log_content}"""
         fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
         if fixed_gjf:
-            st.subheader("\u2705 Fixed .gjf File")
+            st.subheader("✅ Fixed .gjf File")
             st.code(fixed_gjf, language="text")
-            st.download_button("\ud83d\udcc4 Download .gjf", fixed_gjf, file_name="fixed.gjf", mime="text/plain")
-            st.subheader("\ud83d\udd0d Difference")
+            st.download_button("💾 Download .gjf", fixed_gjf, file_name="fixed.gjf", mime="text/plain")
+            st.subheader("🔍 Difference")
             st.code(generate_diff(gjf_content, fixed_gjf), language="diff")
 
             # === Retry / Refine Options ===
-            st.subheader("\ud83d\udd01 Refine or Retry Fix")
+            st.subheader("🔁 Refine or Retry Fix")
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                if st.button("\ud83d\udd2c Tighten Optimization"):
+                if st.button("🔬 Tighten Optimization"):
                     refine_prompt = fix_prompt + "\n\nPlease tighten geometry optimization settings if possible (e.g., tighter convergence or opt=tight)."
                     refined = call_groq(refine_prompt, FIX_MODEL)
                     if refined:
-                        st.subheader("\ud83d\udd27 Refined .gjf (Tighter Opt)")
+                        st.subheader("🔧 Refined .gjf (Tighter Opt)")
                         st.code(refined, language="text")
-                        st.download_button("\ud83d\udcc4 Download Refined .gjf", refined, file_name="refined_opt.gjf", mime="text/plain")
+                        st.download_button("💾 Download Refined .gjf", refined, file_name="refined_opt.gjf", mime="text/plain")
 
             with col2:
-                if st.button("\ud83d\ude80 Increase Memory/CPUs"):
+                if st.button("🚀 Increase Memory/CPUs"):
                     memory_prompt = fix_prompt + "\n\nPlease increase memory and processor count if current job settings are low."
                     refined = call_groq(memory_prompt, FIX_MODEL)
                     if refined:
-                        st.subheader("\ud83d\udd27 More Resources .gjf")
+                        st.subheader("🔧 More Resources .gjf")
                         st.code(refined, language="text")
-                        st.download_button("\ud83d\udcc4 Download More Resources .gjf", refined, file_name="more_resources.gjf", mime="text/plain")
+                        st.download_button("💾 Download More Resources .gjf", refined, file_name="more_resources.gjf", mime="text/plain")
 
             with col3:
-                if st.button("\ud83e\uddea Alternate Method"):
+                if st.button("🧪 Alternate Method"):
                     retry_prompt = fix_prompt + "\n\nTry using a different method or functional to improve stability (e.g., switch from B3LYP to M06)."
                     refined = call_groq(retry_prompt, FIX_MODEL)
                     if refined:
-                        st.subheader("\ud83d\udd27 Alternate Method .gjf")
+                        st.subheader("🔧 Alternate Method .gjf")
                         st.code(refined, language="text")
-                        st.download_button("\ud83d\udcc4 Download Alternate .gjf", refined, file_name="alternate_method.gjf", mime="text/plain")
+                        st.download_button("💾 Download Alternate .gjf", refined, file_name="alternate_method.gjf", mime="text/plain")
 
 # === Manual Fallback ===
 st.divider()
-st.subheader("\ud83d\udcac No files? Just describe your problem:")
+st.subheader("💬 No files? Just describe your problem:")
 manual = st.text_area("Describe issue or paste partial input")
 
-if st.button("\ud83e\udde0 Manual Explain"):
+if st.button("🧠 Manual Explain"):
     if manual.strip():
         with st.spinner("Thinking..."):
-            manual_prompt = f"""You're a Gaussian troubleshooting assistant.\n\nAnalyze the following text. Format response as:\n\n### \ud83d\udd0d Problem\n### \u2753 Why It Happens\n### \ud83d\udee0 How to Fix\n\nIf it's not related to Gaussian or computational chemistry, respond:\n\"This tool is for Gaussian input/log troubleshooting. Please provide a chemistry-related issue.\"\n\n-- User message --\n{manual}"""
+            manual_prompt = f"""You're a Gaussian troubleshooting assistant.\n\nAnalyze the following text. Format response as:\n\n### 🔍 Problem\n### ❓ Why It Happens\n### 🛠 How to Fix\n\nIf it's not related to Gaussian or computational chemistry, respond:\n\"This tool is for Gaussian input/log troubleshooting. Please provide a chemistry-related issue.\"\n\n-- User message --\n{manual}"""
             result = call_groq(manual_prompt, EXPLAIN_MODEL)
             st.markdown(result)
     else:
