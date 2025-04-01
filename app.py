@@ -1,8 +1,10 @@
 import streamlit as st
 import requests
 import difflib
+from PIL import Image
+import pytesseract
 
-st.set_page_config(page_title="Gaussian Repair Tool", layout="centered")
+st.set_page_config(page_title="Gaussian Error Assistant", layout="centered")
 
 # === Init session state for prompts ===
 if "fix_prompt" not in st.session_state:
@@ -12,41 +14,43 @@ if "fix_prompt" not in st.session_state:
 st.markdown("""
 <style>
 .stApp {
-    background-color: #0f0f0f;
+    background-color: #f8f9fa;
     padding: 2rem;
+    font-family: 'Segoe UI', sans-serif;
 }
 h1 {
-    color: #5B8DEE;
-    font-size: 2.4rem;
-    font-weight: 800;
-    margin-bottom: 1.2rem;
+    color: #2c3e50;
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
 }
 h2, h3 {
-    color: #ffffff;
+    color: #2c3e50;
     margin-top: 1.5rem;
     font-weight: 600;
 }
 div[data-testid="stMarkdownContainer"] p {
-    font-size: 1.05rem;
-    color: #cccccc;
+    font-size: 1rem;
+    color: #2c3e50;
 }
 .stButton > button {
-    background-color: #5B8DEE;
+    background-color: #0069d9;
     color: white;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    font-weight: 500;
     border: none;
     transition: 0.3s ease;
 }
 .stButton > button:hover {
-    background-color: #3A68D8;
-    transform: scale(1.02);
+    background-color: #0056b3;
+    transform: scale(1.01);
 }
 .stTextInput input, textarea {
-    background-color: #1f1f1f;
-    color: #eee;
-    border-radius: 8px;
+    background-color: #ffffff;
+    color: #2c3e50;
+    border-radius: 6px;
+    border: 1px solid #ced4da;
 }
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
@@ -55,12 +59,7 @@ header {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # === Title ===
-st.markdown(
-    """
-    <h1>Gaussian Error Fixer <span style='color:#aaa'>— Free and Anonymous</span></h1>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""<h1>Gaussian Error Assistant <span style='color:#6c757d'>– AI-powered diagnostic and correction tool</span></h1>""", unsafe_allow_html=True)
 
 # === Config ===
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -87,164 +86,112 @@ def call_groq(prompt, model):
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"❌ Error: {e}")
         return None
 
 def generate_diff(original, fixed):
     original_lines = original.strip().splitlines()
     fixed_lines = fixed.strip().splitlines()
-    return "\n".join(
-        difflib.unified_diff(
-            original_lines, fixed_lines,
-            fromfile="original.gjf", tofile="fixed.gjf",
-            lineterm=""
-        )
-    )
+    return "\n".join(difflib.unified_diff(original_lines, fixed_lines, fromfile="original.gjf", tofile="fixed.gjf", lineterm=""))
 
-# === Test Data ===
-test_gjf = """%chk=broken.chk
+def extract_text_from_image(uploaded_file):
+    image = Image.open(uploaded_file)
+    return pytesseract.image_to_string(image)
 
-Gaussian Broken Job
-
-0 1
-C       0.000000    0.000000    0.000000
-H       0.000000    0.000000    1.089000
-H       1.026719    0.000000   -0.363000
-H      -0.513360   -0.889165   -0.363000
-H      -0.513360    0.889165   -0.363000
-"""
-
-test_log = """Optimization failed to converge
-Displacement too small, but forces too large
-Error termination via Lnk1e in /g16/l101.exe
-"""
-
-# === Upload Section ===
-st.subheader("Upload Files")
-use_test = st.checkbox("Use Example Files")
+# === Upload UI ===
+st.subheader("File Upload")
+use_test = st.checkbox("Use demonstration files for testing purposes")
 gjf_content, log_content = "", ""
 
 if use_test:
-    gjf_content = test_gjf
-    log_content = test_log
+    gjf_content = "%chk=broken.chk\n\nGaussian Broken Job\n\n0 1\nC       0.000000    0.000000    0.000000\nH       0.000000    0.000000    1.089000\nH       1.026719    0.000000   -0.363000\nH      -0.513360   -0.889165   -0.363000\nH      -0.513360    0.889165   -0.363000"
+    log_content = """ Optimization failed to converge\n Displacement too small, but forces too large\n Error termination via Lnk1e in /g16/l101.exe\n"""
 else:
-    gjf_file = st.file_uploader("Upload a .gjf or .com file", type=["gjf", "com"])
-    log_file = st.file_uploader("Upload a .log or .out file", type=["log", "out"])
-    if gjf_file:
-        gjf_content = read_uploaded_file(gjf_file)
-    if log_file:
-        log_content = read_uploaded_file(log_file)
+    gjf_file = st.file_uploader("Upload a .gjf file", type=["gjf", "com"])
+    log_file = st.file_uploader("Upload the corresponding .log or .out file", type=["log", "out"])
+    if gjf_file: gjf_content = read_uploaded_file(gjf_file)
+    if log_file: log_content = read_uploaded_file(log_file)
 
-# === Analyze & Fix Section ===
-if st.button("Analyze and Fix"):
+# === Analyze & Fix ===
+if st.button("Analyze & Fix"):
     if not gjf_content or not log_content:
-        st.warning("Please provide both the input (.gjf/.com) and log (.log/.out) files.")
+        st.warning("Required files are missing. Please ensure both input and log files are provided.")
         st.stop()
 
-    with st.spinner("Analyzing..."):
-        # Explanation
-        explain_prompt = f"""You're a Gaussian expert.
-
-Analyze the input (.gjf) and log file below. Provide a concise explanation in this format:
-
-### Problem
-### Why It Happens
-### How to Fix
-
--- .gjf --
-{gjf_content}
-
--- .log --
-{log_content}
-"""
+    with st.spinner("Analyzing input and log files..."):
+        explain_prompt = f"""You're an expert in Gaussian computational chemistry.\n\nAnalyze the provided input and log files. Respond with:\n\n### Problem\n### Likely Cause\n### Recommended Solution\n\n-- Input File --\n{gjf_content}\n\n-- Log File --\n{log_content}"""
         explanation = call_groq(explain_prompt, EXPLAIN_MODEL)
-        st.subheader("Explanation")
-        if explanation:
-            st.markdown(explanation)
-            st.download_button("Download Explanation", explanation,
-                              file_name="explanation.txt", mime="text/plain")
+        st.subheader("Diagnostic Explanation")
+        st.markdown(explanation)
+        st.download_button("Download Explanation", explanation, file_name="explanation.txt", mime="text/plain")
 
-        # Fix .gjf
-        fix_prompt = f"""Please correct the Gaussian .gjf file based on the log's information.
-Only provide a valid .gjf file as your response.
-
--- .gjf --
-{gjf_content}
-
--- .log --
-{log_content}
-"""
+        fix_prompt = f"""Based on the input and log files, correct the Gaussian input file.\nOnly return the corrected .gjf content.\n\n-- Input File --\n{gjf_content}\n\n-- Log File --\n{log_content}"""
         st.session_state.fix_prompt = fix_prompt
         fixed_gjf = call_groq(fix_prompt, FIX_MODEL)
         if fixed_gjf:
-            st.subheader("Fixed .gjf File")
+            st.subheader("Corrected Input File (.gjf)")
             st.code(fixed_gjf, language="text")
-            st.download_button("Download Fixed .gjf", fixed_gjf,
-                              file_name="fixed.gjf", mime="text/plain")
+            st.download_button("Download Fixed File", fixed_gjf, file_name="fixed.gjf", mime="text/plain")
+            st.subheader("Comparison: Original vs. Corrected")
+            st.code(generate_diff(gjf_content, fixed_gjf), language="diff")
 
-            st.subheader("Difference (Original vs Fixed)")
-            diff_result = generate_diff(gjf_content, fixed_gjf)
-            st.code(diff_result, language="diff")
-
-# === Refinement Section ===
+# === Retry / Refine Options ===
 if st.session_state.fix_prompt:
-    st.subheader("Refinement Options")
+    st.subheader("Optional Refinements")
     col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("Tighten Optimization"):
-            refine_prompt = st.session_state.fix_prompt + "\n\nPlease tighten geometry optimization settings if possible."
+            refine_prompt = st.session_state.fix_prompt + "\n\nPlease apply tighter convergence criteria for optimization."
             refined = call_groq(refine_prompt, FIX_MODEL)
             if refined:
-                st.subheader("Refined .gjf (Tighter Opt)")
+                st.subheader("Tighter Optimization")
                 st.code(refined, language="text")
-                st.download_button("Download Refined .gjf", refined,
-                                  file_name="refined_opt.gjf", mime="text/plain")
+                st.download_button("Download Refined File", refined, file_name="refined_opt.gjf", mime="text/plain")
 
     with col2:
-        if st.button("Increase Memory/CPUs"):
-            memory_prompt = st.session_state.fix_prompt + "\n\nPlease increase memory and processor count."
+        if st.button("Allocate More Resources"):
+            memory_prompt = st.session_state.fix_prompt + "\n\nPlease increase memory and processor usage for the job."
             refined = call_groq(memory_prompt, FIX_MODEL)
             if refined:
-                st.subheader("Refined .gjf (More Resources)")
+                st.subheader("Enhanced Resources")
                 st.code(refined, language="text")
-                st.download_button("Download Refined .gjf", refined,
-                                  file_name="more_resources.gjf", mime="text/plain")
+                st.download_button("Download Modified File", refined, file_name="more_resources.gjf", mime="text/plain")
 
     with col3:
         if st.button("Alternate Method"):
-            retry_prompt = st.session_state.fix_prompt + "\n\nTry a different method or functional for better stability."
+            retry_prompt = st.session_state.fix_prompt + "\n\nConsider using a different method or functional to improve convergence."
             refined = call_groq(retry_prompt, FIX_MODEL)
             if refined:
-                st.subheader("Refined .gjf (Alternate Method)")
+                st.subheader("Alternate Computational Method")
                 st.code(refined, language="text")
-                st.download_button("Download Refined .gjf", refined,
-                                  file_name="alternate_method.gjf", mime="text/plain")
+                st.download_button("Download Alternate File", refined, file_name="alternate_method.gjf", mime="text/plain")
 
-# === Manual Input Section ===
+# === Manual Fallback ===
 st.divider()
-st.subheader("Manual Description (No Files)")
-manual = st.text_area("Describe your issue or paste partial input here:")
+st.subheader("Manual Input")
+manual = st.text_area("Describe your issue or paste Gaussian input/output text")
 
-if st.button("Explain Manually"):
+if st.button("Analyze Manual Entry"):
     if manual.strip():
-        with st.spinner("Analyzing your description..."):
-            manual_prompt = f"""You are a Gaussian troubleshooting assistant.
-
-Analyze the following text and provide a structured response in this format:
-
-### Problem
-### Why It Happens
-### How to Fix
-
-If the issue is not Gaussian or computational-chemistry-related, respond:
-"This tool is for Gaussian input/log troubleshooting. Please provide a relevant issue."
-
--- User message --
-{manual}
-"""
+        with st.spinner("Analyzing manual entry..."):
+            manual_prompt = f"""You are a Gaussian error diagnostic assistant.\n\nAnalyze the following user-provided content. Respond with:\n\n### Problem\n### Likely Cause\n### Recommended Solution\n\nIf irrelevant, kindly respond: 'This tool is designed to assist with Gaussian-related issues.'\n\n-- User Message --\n{manual}"""
             result = call_groq(manual_prompt, EXPLAIN_MODEL)
-            if result:
-                st.markdown(result)
+            st.markdown(result)
     else:
-        st.warning("Please enter a description first.")
+        st.warning("Please enter a valid message for analysis.")
+
+# === Image OCR Upload ===
+st.divider()
+st.subheader("Image-Based Error Analysis")
+image_file = st.file_uploader("Upload a screenshot of the Gaussian error message (PNG or JPG)", type=["png", "jpg", "jpeg"])
+
+if image_file and st.button("Analyze Image Error"):
+    with st.spinner("Extracting text from image and analyzing..."):
+        ocr_text = extract_text_from_image(image_file)
+        st.image(image_file, caption="Uploaded Image", use_column_width=True)
+        st.code(ocr_text, language="text")
+
+        image_prompt = f"""You are a Gaussian troubleshooting expert.\nAnalyze the extracted text from a user-provided screenshot.\n\n{ocr_text}\n\nRespond with:\n### Problem\n### Likely Cause\n### Recommended Solution\n"""
+        result = call_groq(image_prompt, EXPLAIN_MODEL)
+        st.markdown(result)
