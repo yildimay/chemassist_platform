@@ -4,24 +4,24 @@ import difflib
 import base64
 from PIL import Image
 import os
+import py3Dmol
+from rdkit import Chem
+from rdkit.Chem import Draw, AllChem
 
 st.set_page_config(page_title="ChemAssist Platform", layout="centered")
 
-# 🌐 API setup
+# API setup
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 EXPLAIN_MODEL = "llama3-8b-8192"
 FIX_MODEL = "llama3-70b-8192"
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
-# === Init session ===
 if "fix_prompt" not in st.session_state:
     st.session_state.fix_prompt = ""
 
-# === Sidebar: Software Picker ===
 st.sidebar.title("🧪 ChemAssist Tools")
 selected_software = st.sidebar.selectbox("Which software are you using?", ["Select...", "Gaussian", "Modeling"])
 
-# === AI Model Picker (if Gaussian selected)
 if selected_software == "Gaussian":
     st.sidebar.subheader("🤖 AI Model")
     ai_model = st.sidebar.radio("Choose AI engine:", ["GROQ", "GPT-4"])
@@ -32,16 +32,8 @@ if selected_software == "Gaussian":
 
     def call_model(prompt, model="groq-explain"):
         if use_gpt4 and openai_api_key:
-            headers = {
-                "Authorization": f"Bearer {openai_api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": "gpt-4",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1000,
-                "temperature": 0.3
-            }
+            headers = {"Authorization": f"Bearer {openai_api_key}", "Content-Type": "application/json"}
+            payload = {"model": "gpt-4", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1000, "temperature": 0.3}
             response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
             try:
                 return response.json()["choices"][0]["message"]["content"]
@@ -49,16 +41,8 @@ if selected_software == "Gaussian":
                 return "[❌ Error from OpenAI GPT-4]"
         else:
             llama_model = EXPLAIN_MODEL if model == "groq-explain" else FIX_MODEL
-            headers = {
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": llama_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 900,
-                "temperature": 0.3
-            }
+            headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+            data = {"model": llama_model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 900, "temperature": 0.3}
             try:
                 res = requests.post(GROQ_API_URL, headers=headers, json=data)
                 res.raise_for_status()
@@ -71,20 +55,12 @@ if selected_software == "Gaussian":
         return file.read().decode("utf-8", errors="ignore")
 
     def generate_diff(original, fixed):
-        return "\n".join(difflib.unified_diff(
-            original.strip().splitlines(),
-            fixed.strip().splitlines(),
-            fromfile="original.gjf", tofile="fixed.gjf", lineterm=""
-        ))
+        return "\n".join(difflib.unified_diff(original.strip().splitlines(), fixed.strip().splitlines(), fromfile="original.gjf", tofile="fixed.gjf", lineterm=""))
 
     def extract_text_ocr_space(image_file):
         api_key = "helloworld"
         base64_img = base64.b64encode(image_file.read()).decode("utf-8")
-        payload = {
-            "base64Image": f"data:image/png;base64,{base64_img}",
-            "language": "eng",
-            "isOverlayRequired": False,
-        }
+        payload = {"base64Image": f"data:image/png;base64,{base64_img}", "language": "eng", "isOverlayRequired": False}
         headers = {"apikey": api_key}
         res = requests.post("https://api.ocr.space/parse/image", data=payload, headers=headers)
         try:
@@ -102,7 +78,6 @@ if selected_software == "Gaussian":
     with st.expander("📂 File Upload"):
         use_test = st.checkbox("Use built-in sample files")
         gjf_content = log_content = ""
-
         if use_test:
             gjf_content = "%chk=broken.chk\n\nGaussian Broken Job\n\n0 1\nC       0.000000    0.000000    0.000000\nH       0.000000    0.000000    1.089000\nH       1.026719    0.000000   -0.363000\nH      -0.513360   -0.889165   -0.363000\nH      -0.513360    0.889165   -0.363000"
             log_content = " Optimization failed to converge\n Displacement too small, but forces too large\n Error termination via Lnk1e in /g16/l101.exe"
@@ -116,35 +91,12 @@ if selected_software == "Gaussian":
             if not gjf_content or not log_content:
                 st.warning("Missing input files.")
                 st.stop()
-
             with st.spinner("Analyzing..."):
-                explain_prompt = f"""You're a Gaussian expert.
-
-Analyze this input and log file.
-
-### Problem
-### Likely Cause
-### Recommended Solution
-
--- .gjf file --
-{gjf_content}
-
--- .log file --
-{log_content}
-"""
+                explain_prompt = f"""You're a Gaussian expert.\n\nAnalyze this input and log file.\n\n### Problem\n### Likely Cause\n### Recommended Solution\n\n-- .gjf file --\n{gjf_content}\n\n-- .log file --\n{log_content}"""
                 explanation = call_model(explain_prompt, model="groq-explain")
                 st.subheader("📘 Explanation")
                 st.markdown(explanation)
-
-                fix_prompt = f"""Fix the broken .gjf using the .log file.
-Return only the corrected .gjf file.
-
--- .gjf --
-{gjf_content}
-
--- .log --
-{log_content}
-"""
+                fix_prompt = f"""Fix the broken .gjf using the .log file.\nReturn only the corrected .gjf file.\n\n-- .gjf --\n{gjf_content}\n\n-- .log --\n{log_content}"""
                 st.session_state.fix_prompt = fix_prompt
                 fixed_gjf = call_model(fix_prompt, model="groq-fix")
                 if fixed_gjf:
@@ -189,7 +141,6 @@ Return only the corrected .gjf file.
                 analysis = call_model(f"Analyze this extracted Gaussian error:\n{cleaned}", model="groq-explain")
                 st.markdown(analysis)
 
-# === MODELING SECTION ===
 if selected_software == "Modeling":
     st.title("🧪 Molecule Builder (SMILES → MOL)")
     st.markdown("Enter a SMILES string to generate and download a .mol file.")
@@ -198,9 +149,6 @@ if selected_software == "Modeling":
 
     if st.button("🛠 Convert to MOL"):
         try:
-            from rdkit import Chem
-            from rdkit.Chem import Draw
-
             mol = Chem.MolFromSmiles(smiles_input)
             mol_filename = "molecule.mol"
             Chem.MolToMolFile(mol, mol_filename)
@@ -210,5 +158,20 @@ if selected_software == "Modeling":
 
             img = Draw.MolToImage(mol, size=(300, 300))
             st.image(img, caption="Molecule Preview")
+
+            with st.expander("🧬 3D Molecule Viewer (.xyz preview)"):
+                try:
+                    mol3d = Chem.AddHs(mol)
+                    AllChem.EmbedMolecule(mol3d, AllChem.ETKDG())
+                    xyz_block = Chem.MolToXYZBlock(mol3d)
+                    viewer = py3Dmol.view(width=400, height=300)
+                    viewer.addModel(xyz_block, "xyz")
+                    viewer.setStyle({"stick": {}})
+                    viewer.zoomTo()
+                    viewer.show()
+                    st.components.v1.html(viewer._make_html(), height=300)
+                except:
+                    st.warning("3D structure could not be generated.")
+
         except Exception as e:
             st.error(f"Could not process SMILES string: {e}")
