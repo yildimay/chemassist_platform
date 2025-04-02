@@ -5,29 +5,31 @@ import base64
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Gaussian Error Assistant", layout="centered")
-st.sidebar.header("⚙️ Choose Software")
-selected_software = st.sidebar.selectbox("Which software are you using?", ["Select...", "Gaussian"])
+st.set_page_config(page_title="ChemAssist Platform", layout="centered")
 
+# 🌐 API setup
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+EXPLAIN_MODEL = "llama3-8b-8192"
+FIX_MODEL = "llama3-70b-8192"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+
+# === Init session ===
+if "fix_prompt" not in st.session_state:
+    st.session_state.fix_prompt = ""
+
+# === Sidebar: Software Picker ===
+st.sidebar.title("🧪 ChemAssist Tools")
+selected_software = st.sidebar.selectbox("Which software are you using?", ["Select...", "Gaussian", "Modeling"])
+
+# === AI Model Picker (if Gaussian selected)
 if selected_software == "Gaussian":
-    st.sidebar.subheader("🤖 Select AI Model")
+    st.sidebar.subheader("🤖 AI Model")
     ai_model = st.sidebar.radio("Choose AI engine:", ["GROQ", "GPT-4"])
     use_gpt4 = (ai_model == "GPT-4")
     openai_api_key = ""
     if use_gpt4:
         openai_api_key = st.sidebar.text_input("Enter your OpenAI API Key", type="password")
 
-    # 🌐 API settings
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    EXPLAIN_MODEL = "llama3-8b-8192"
-    FIX_MODEL = "llama3-70b-8192"
-    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-
-    # === Init session ===
-    if "fix_prompt" not in st.session_state:
-        st.session_state.fix_prompt = ""
-
-    # === API Call Function ===
     def call_model(prompt, model="groq-explain"):
         if use_gpt4 and openai_api_key:
             headers = {
@@ -75,7 +77,6 @@ if selected_software == "Gaussian":
             fromfile="original.gjf", tofile="fixed.gjf", lineterm=""
         ))
 
-    # === OCR + Cleaner ===
     def extract_text_ocr_space(image_file):
         api_key = "helloworld"
         base64_img = base64.b64encode(image_file.read()).decode("utf-8")
@@ -96,8 +97,7 @@ if selected_software == "Gaussian":
         lines = text.splitlines()
         return "\n".join([l for l in lines if not any(j in l for j in junk)]).strip()
 
-    # === Interface ===
-    st.title("Gaussian Error Assistant")
+    st.title("⚛️ Gaussian Error Assistant")
 
     with st.expander("📂 File Upload"):
         use_test = st.checkbox("Use built-in sample files")
@@ -154,7 +154,6 @@ Return only the corrected .gjf file.
                     st.subheader("🔍 Difference")
                     st.code(generate_diff(gjf_content, fixed_gjf), language="diff")
 
-    # === Retry Buttons ===
     if st.session_state.fix_prompt:
         with st.expander("🔁 Refine or Retry"):
             col1, col2, col3 = st.columns(3)
@@ -171,7 +170,6 @@ Return only the corrected .gjf file.
                     refined = call_model(st.session_state.fix_prompt + "\nTry a different method or functional.", model="groq-fix")
                     if refined: st.code(refined)
 
-    # === Manual Entry ===
     with st.expander("✍️ Manual Error Entry"):
         manual_input = st.text_area("Paste Gaussian error text here:")
         if st.button("Analyze Manual Text"):
@@ -180,7 +178,6 @@ Return only the corrected .gjf file.
                     result = call_model(f"Analyze the following Gaussian output:\n{manual_input}", model="groq-explain")
                     st.markdown(result)
 
-    # === Image OCR Analysis ===
     with st.expander("🖼️ Image-Based Error Analysis"):
         img = st.file_uploader("Upload Screenshot (.png/.jpg)", type=["png", "jpg", "jpeg"])
         if img and st.button("Analyze Image Error"):
@@ -191,11 +188,13 @@ Return only the corrected .gjf file.
                 st.code(cleaned)
                 analysis = call_model(f"Analyze this extracted Gaussian error:\n{cleaned}", model="groq-explain")
                 st.markdown(analysis)
+
+# === MODELING SECTION ===
 if selected_software == "Modeling":
     st.title("🧪 Molecule Builder (SMILES → MOL)")
     st.markdown("Enter a SMILES string to generate and download a .mol file.")
 
-    smiles_input = st.text_input("💬 Enter SMILES", value="CCO")  # default: ethanol
+    smiles_input = st.text_input("💬 Enter SMILES", value="CCO")
 
     if st.button("🛠 Convert to MOL"):
         try:
@@ -209,7 +208,6 @@ if selected_software == "Modeling":
             st.success("MOL file generated!")
             st.download_button("💾 Download .mol file", open(mol_filename, "rb").read(), file_name=mol_filename)
 
-            # Display molecule image
             img = Draw.MolToImage(mol, size=(300, 300))
             st.image(img, caption="Molecule Preview")
         except Exception as e:
