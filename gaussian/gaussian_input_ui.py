@@ -50,9 +50,7 @@ Given the following molecule in XYZ format:
 {truncate_structure_input(smiles_xyz)}
 
 And this paper excerpt:
-"""
 {paper_text[:4000]}
-"""
 
 Extract the method, basis set, charge, multiplicity, and generate a Gaussian input (.gjf) file. Output only the .gjf content.
 """
