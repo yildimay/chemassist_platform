@@ -1,0 +1,8 @@
+streamlit
+rdkit
+pillow
+requests
+python-dotenv
+ipywidgets
+ipython-genutils
+numpy
