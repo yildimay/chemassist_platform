@@ -2,3 +2,4 @@ streamlit
 Pillow
 requests
 rdkit-pypi
+py3Dmol
