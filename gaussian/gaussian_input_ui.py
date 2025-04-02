@@ -1,66 +1,70 @@
-import streamlit as st
-import tempfile
-import base64
 import os
 import requests
+import json
+import streamlit as st
 
-def call_ai(prompt):
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-    AI_MODEL = "llama3-70b-8192"
+
+def truncate_structure_input(structure: str, max_chars: int = 3000) -> str:
+    """
+    Trims long molecule structure data for API safety.
+    Adds a note to the prompt so the AI knows it's partial.
+    """
+    if len(structure) <= max_chars:
+        return structure
+    else:
+        lines = structure.splitlines()
+        truncated_lines = []
+        total_len = 0
+
+        for line in lines:
+            if total_len + len(line) > max_chars:
+                break
+            truncated_lines.append(line)
+            total_len += len(line) + 1  # for \n
+
+        return "\n".join(truncated_lines) + "\n... [structure truncated for safety]"
+
+
+def call_groq_for_gjf(job_name, method_basis, charge, multiplicity, structure):
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY")  # Make sure it's set in Render
+
+    if not GROQ_API_KEY:
+        raise ValueError("GROQ_API_KEY not found in environment variables.")
+
+    safe_structure = truncate_structure_input(structure)
+
+    prompt = f"""
+Write a Gaussian input (.gjf) file using the following data:
+- Job name: {job_name}
+- Method/Basis: {method_basis}
+- Charge: {charge}
+- Multiplicity: {multiplicity}
+- Molecular structure (may be truncated):\n{safe_structure}
+Only output the .gjf content.
+"""
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
-    data = {
-        "model": AI_MODEL,
+
+    payload = {
+        "model": "llama3-70b-8192",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1500,
-        "temperature": 0.3
+        "temperature": 0.5
     }
-    try:
-        response = requests.post(GROQ_API_URL, headers=headers, json=data)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"[ERROR] AI processing failed: {e}"
 
-def gaussian_input_ui():
-    st.title("Gaussian Input Creator")
-    st.markdown("This tool generates a Gaussian input (.gjf) file using your molecule's SMILES and a reference paper.")
+    response = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                             headers=headers, data=json.dumps(payload))
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
 
-    st.subheader("1. Upload Reference Paper")
-    uploaded_pdf = st.file_uploader("Upload a reference PDF file", type=["pdf"])
 
-    st.subheader("2. Enter Molecule SMILES")
-    smiles_input = st.text_input("Enter SMILES string of the molecule")
-
-    st.subheader("3. Select Gaussian Version")
-    selected_version = st.selectbox("Choose Gaussian version", ["G16", "G09", "Other"])
-
-    st.subheader("4. Generate Input File")
-    if st.button("Create .gjf File"):
-        if not uploaded_pdf or not smiles_input:
-            st.warning("Please provide both a PDF and a SMILES string.")
-        else:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(uploaded_pdf.read())
-                tmp_path = tmp.name
-            try:
-                with open(tmp_path, "rb") as f:
-                    encoded_pdf = base64.b64encode(f.read()).decode()
-                ai_prompt = f"""
-You are a computational chemistry assistant. A user uploaded a reference paper (PDF, base64 encoded) and provided the SMILES of a molecule. Based on the content of the reference and the molecular structure, generate a Gaussian input (.gjf) file with the appropriate route section, method, basis set, and coordinates.
-
-SMILES: {smiles_input}
-Gaussian Version: {selected_version}
-PDF (base64): {encoded_pdf}
-
-Respond with only the final .gjf file content, no commentary.
-"""
-                result = call_ai(ai_prompt)
-                st.code(result, language="text")
-                st.download_button("Download .gjf File", result, file_name="generated.gjf", mime="text/plain")
-            except Exception as e:
-                st.error(f"Error reading or processing file: {e}")
+# 🔁 Use this inside your Streamlit UI:
+if st.button("Create .gjf File"):
+    with st.spinner("Generating input file using AI..."):
+        try:
+            gjf_result = call_groq_for_gjf(job_name, method_basis, charge, multiplicity, structure)
+            st.code(gjf_result.strip(), language='gjf')
+        except Exception as e:
+            st.error(f"[ERROR] AI processing failed: {e}")
