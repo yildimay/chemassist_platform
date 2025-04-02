@@ -191,3 +191,26 @@ Return only the corrected .gjf file.
                 st.code(cleaned)
                 analysis = call_model(f"Analyze this extracted Gaussian error:\n{cleaned}", model="groq-explain")
                 st.markdown(analysis)
+if selected_software == "Modeling":
+    st.title("🧪 Molecule Builder (SMILES → MOL)")
+    st.markdown("Enter a SMILES string to generate and download a .mol file.")
+
+    smiles_input = st.text_input("💬 Enter SMILES", value="CCO")  # default: ethanol
+
+    if st.button("🛠 Convert to MOL"):
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import Draw
+
+            mol = Chem.MolFromSmiles(smiles_input)
+            mol_filename = "molecule.mol"
+            Chem.MolToMolFile(mol, mol_filename)
+
+            st.success("MOL file generated!")
+            st.download_button("💾 Download .mol file", open(mol_filename, "rb").read(), file_name=mol_filename)
+
+            # Display molecule image
+            img = Draw.MolToImage(mol, size=(300, 300))
+            st.image(img, caption="Molecule Preview")
+        except Exception as e:
+            st.error(f"Could not process SMILES string: {e}")
