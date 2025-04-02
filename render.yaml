@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: chemassist-platform
-    env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
