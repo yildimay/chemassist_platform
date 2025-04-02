@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import requests
 import json
+from rdkit import Chem
+from rdkit.Chem import AllChem
+import fitz  # PyMuPDF
 
 
 def truncate_structure_input(structure: str, max_chars: int = 3000) -> str:
@@ -18,34 +21,51 @@ def truncate_structure_input(structure: str, max_chars: int = 3000) -> str:
     return "\n".join(truncated_lines) + "\n... [structure truncated for safety]"
 
 
-def call_groq_for_gjf(job_name, method_basis, charge, multiplicity, structure):
+def smiles_to_xyz(smiles: str) -> str:
+    mol = Chem.MolFromSmiles(smiles)
+    mol = Chem.AddHs(mol)
+    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+    AllChem.UFFOptimizeMolecule(mol)
+    conf = mol.GetConformer()
+    xyz = f"{mol.GetNumAtoms()}\nGenerated from SMILES\n"
+    for atom in mol.GetAtoms():
+        pos = conf.GetAtomPosition(atom.GetIdx())
+        xyz += f"{atom.GetSymbol()} {pos.x:.4f} {pos.y:.4f} {pos.z:.4f}\n"
+    return xyz
+
+
+def extract_text_from_pdf(uploaded_file) -> str:
+    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+    text = "\n".join([page.get_text() for page in doc])
+    return text
+
+
+def call_groq_for_gjf_from_paper(smiles_xyz, paper_text):
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
     if not GROQ_API_KEY:
-        raise ValueError("GROQ_API_KEY not found in environment variables.")
-
-    safe_structure = truncate_structure_input(structure)
+        raise ValueError("GROQ_API_KEY not set in environment variables.")
 
     prompt = f"""
-Write a Gaussian input (.gjf) file using the following data:
-- Job name: {job_name}
-- Method/Basis: {method_basis}
-- Charge: {charge}
-- Multiplicity: {multiplicity}
-- Molecular structure (may be truncated):\n{safe_structure}
-Only output the .gjf content.
+Given the following molecule in XYZ format:
+{truncate_structure_input(smiles_xyz)}
+
+And this paper excerpt:
+"""
+{paper_text[:4000]}
+"""
+
+Extract the method, basis set, charge, multiplicity, and generate a Gaussian input (.gjf) file. Output only the .gjf content.
 """
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
-
     payload = {
         "model": "llama3-70b-8192",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5
     }
-
     response = requests.post("https://api.groq.com/openai/v1/chat/completions",
                              headers=headers, data=json.dumps(payload))
     response.raise_for_status()
@@ -53,27 +73,24 @@ Only output the .gjf content.
 
 
 def gaussian_input_ui():
-    st.title("Gaussian Input Creator")
+    st.title("Gaussian Input from SMILES + Paper")
 
-    st.markdown("### Step 1: Job Settings")
-    job_name = st.text_input("Job Name", "my_calculation")
-    method_basis = st.text_input("Method/Basis Set", "B3LYP/6-31G(d)")
+    st.markdown("### Upload SMILES and Reference Paper")
+    smiles = st.text_input("Enter SMILES string")
+    uploaded_pdf = st.file_uploader("Upload reference paper (PDF)", type="pdf")
 
-    st.markdown("### Step 2: Charge and Multiplicity")
-    col1, col2 = st.columns(2)
-    charge = col1.number_input("Charge", value=0, step=1)
-    multiplicity = col2.number_input("Multiplicity", value=1, step=1)
+    if st.button("Validate & Generate .gjf from Paper"):
+        if not smiles or not uploaded_pdf:
+            st.warning("Please provide both a SMILES and a paper PDF.")
+            return
 
-    st.markdown("### Step 3: Paste Molecular Structure (XYZ format)")
-    structure = st.text_area("Structure", height=200)
-
-    st.markdown("### Step 4: Generate Input File")
-    if st.button("Create .gjf File"):
-        with st.spinner("Generating input file using AI..."):
-            try:
-                gjf_result = call_groq_for_gjf(job_name, method_basis, charge, multiplicity, structure)
-                st.code(gjf_result.strip(), language='gjf')
-            except Exception as e:
-                st.error(f"[ERROR] AI processing failed: {e}")
-
-    st.download_button("Download .gjf File", data=structure, file_name=f"{job_name}.gjf")
+        try:
+            with st.spinner("Processing paper and molecule..."):
+                xyz_data = smiles_to_xyz(smiles)
+                paper_text = extract_text_from_pdf(uploaded_pdf)
+                gjf_output = call_groq_for_gjf_from_paper(xyz_data, paper_text)
+                st.success(".gjf file generated from SMILES + paper!")
+                st.code(gjf_output, language="gjf")
+                st.download_button("Download .gjf File", data=gjf_output, file_name="generated_input.gjf")
+        except Exception as e:
+            st.error(f"Error: {e}")
