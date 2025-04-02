@@ -1,5 +1,8 @@
 streamlit
-Pillow
+rdkit
+pillow
 requests
-rdkit-pypi
-py3Dmol
+python-dotenv
+ipywidgets
+ipython-genutils
+numpy
