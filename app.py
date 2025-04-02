@@ -3,8 +3,8 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
-from gaussian.gaussian_input_ui import gaussian_input_ui
-from gaussian.gaussian_fixer_ui import gaussian_fixer_ui
+from gaussian.gaussian_input_ui.py import gaussian_input_ui
+from gaussian.gaussian_fixer_ui.py import gaussian_fixer_ui
 from smiles_to_mol import smiles_ui
 
 # Set Streamlit page configuration
