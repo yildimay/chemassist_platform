@@ -1,72 +1,86 @@
 import streamlit as st
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw
-import base64
-import os
-import tempfile
-from rdkit.Chem import rdDepictor
-from rdkit.Chem.Draw import rdMolDraw2D
+from rdkit.Chem.rdmolfiles import MolToMolBlock, MolToXYZBlock
+import streamlit.components.v1 as components
+from PIL import Image
+import io
+
+
+def render_3d_molecule(mol):
+    try:
+        mol_block = MolToMolBlock(mol)
+        mol_block = mol_block.replace("\n", "\\n")  # preserve formatting for JS
+        viewer_html = f"""
+        <div style='height: 500px; width: 100%; position: relative;'>
+        <script src='https://3Dmol.csb.pitt.edu/build/3Dmol-min.js'></script>
+        <div id='viewer' style='height: 100%; width: 100%;'></div>
+        <script>
+            let viewer = $3Dmol.createViewer('viewer', {{backgroundColor: "white"}});
+            viewer.addModel("{mol_block}", "mol");
+            viewer.setStyle({{}}, {{stick: {{}}}});
+            viewer.zoomTo();
+            viewer.render();
+        </script>
+        </div>
+        """
+        components.html(viewer_html, height=500)
+    except Exception as e:
+        st.error(f"Failed to render 3D model: {e}")
+
 
 def smiles_ui():
     st.title("🧬 SMILES to MOL Converter")
 
-    st.header("📩 Input")
+    st.markdown("### 📩 Input")
     smiles = st.text_input("Enter SMILES string:", "")
 
-    view_mode = st.radio("Display Mode", ["3D Viewer", "XYZ Coordinates"])
+    display_mode = st.radio("Display Mode", ["2D Viewer", "3D Viewer", "XYZ Coordinates"])
 
     if st.button("Convert to MOL") and smiles:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol:
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                st.error("❌ Invalid SMILES string.")
+                return
+
             mol = Chem.AddHs(mol)
-            embed_result = AllChem.EmbedMolecule(mol)
-            if embed_result != 0:
-                st.warning("3D embedding failed.")
-                return
 
-            opt_result = AllChem.UFFOptimizeMolecule(mol)
-            if opt_result != 0:
-                st.warning("3D optimization failed.")
-                return
+            # Try multiple embedding methods
+            embedded = False
+            for method in [AllChem.ETKDG(), AllChem.ETKDGv2(), AllChem.ETKDGv3()]:
+                if AllChem.EmbedMolecule(mol, method) == 0:
+                    embedded = True
+                    break
 
-            mol_block = Chem.MolToMolBlock(mol)
-            xyz_block = Chem.MolToXYZBlock(mol)
+            if not embedded:
+                raise ValueError("3D embedding failed.")
 
-            st.success("MOL file generated!")
-            b64 = base64.b64encode(mol_block.encode()).decode()
-            href = f'<a href="data:file/mol;base64,{b64}" download="molecule.mol">Download .mol file</a>'
-            st.markdown(href, unsafe_allow_html=True)
+            # Soft optimization
+            try:
+                AllChem.UFFOptimizeMolecule(mol, maxIters=100)
+            except:
+                try:
+                    props = AllChem.MMFFGetMoleculeProperties(mol)
+                    ff = AllChem.MMFFGetMoleculeForceField(mol, props)
+                    ff.Minimize(maxIts=150)
+                except:
+                    raise ValueError("3D optimization with UFF and MMFF failed.")
 
-            col1, col2 = st.columns([1, 1])
+            # Show outputs
+            if display_mode == "XYZ Coordinates":
+                xyz_data = MolToXYZBlock(mol)
+                st.text_area("XYZ Coordinates", value=xyz_data, height=300)
 
-            with col1:
-                rdDepictor.Compute2DCoords(mol)
-                drawer = rdMolDraw2D.MolDraw2DCairo(300, 300)
-                drawer.drawOptions().addStereoAnnotation = True
-                drawer.drawOptions().explicitMethyl = True
-                drawer.drawOptions().addAtomIndices = False
-                drawer.DrawMolecule(mol)
-                drawer.FinishDrawing()
-                png = drawer.GetDrawingText()
-                st.image(png, caption="Molecule Preview")
+            elif display_mode == "2D Viewer":
+                mol_2d = Chem.MolFromSmiles(smiles)
+                img = Draw.MolToImage(mol_2d, size=(400, 400))
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                st.image(buf.getvalue(), caption="2D Structure")
 
-            with col2:
-                if view_mode == "XYZ Coordinates":
-                    st.subheader("📄 XYZ Coordinates")
-                    st.code(xyz_block, language="xyz")
-                elif view_mode == "3D Viewer":
-                    st.subheader("🧬 3D Molecule Viewer")
-                    try:
-                        import py3Dmol
-                        viewer = py3Dmol.view(width=400, height=300)
-                        viewer.addModel(xyz_block, "xyz")
-                        viewer.setStyle({"stick": {}})
-                        viewer.zoomTo()
-                        st.components.v1.html(viewer._make_html(), height=300)
-                    except Exception as e:
-                        st.warning(f"3D structure could not be generated: {e}")
-        else:
-            st.error("Invalid SMILES string.")
+            elif display_mode == "3D Viewer":
+                render_3d_molecule(mol)
 
-def gaussian_input_ui():
-    pass
+        except Exception as e:
+            st.error(f"3D optimization failed: {e}")
