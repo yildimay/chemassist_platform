@@ -66,8 +66,11 @@ Extract the method, basis set, charge, multiplicity, and generate a Gaussian inp
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5
     }
-    response = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                             headers=headers, data=json.dumps(payload))
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers=headers,
+        data=json.dumps(payload)
+    )
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
 
