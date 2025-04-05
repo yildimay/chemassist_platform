@@ -1,12 +1,11 @@
 import streamlit as st
 import requests
-import difflib
 import os
 
 def gaussian_fixer_ui():
     st.title("Gaussian Error Fixer")
-
     st.subheader("Upload Files")
+
     gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
     log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
 
@@ -17,9 +16,13 @@ def gaussian_fixer_ui():
     gjf_content = gjf_file.read().decode("utf-8", errors="ignore")
     log_content = log_file.read().decode("utf-8", errors="ignore")
 
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")  # Now it works with Render env vars
-MODEL = "llama3-70b-8192"
+    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    MODEL = "llama3-70b-8192"
+
+    if not GROQ_API_KEY:
+        st.error("Missing GROQ_API_KEY! Please set it in your Render Environment tab.")
+        return
 
     def call_groq(prompt):
         headers = {
@@ -44,6 +47,7 @@ MODEL = "llama3-70b-8192"
         with st.spinner("Analyzing error and generating fix..."):
             prompt = f"""
 You're a Gaussian expert.
+
 Given the following input file (.gjf) and log file (.log), explain what went wrong and generate a corrected .gjf file.
 
 Input (.gjf):
