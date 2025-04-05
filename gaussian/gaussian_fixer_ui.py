@@ -1,6 +1,13 @@
 import streamlit as st
 import requests
 import difflib
+import os
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    st.error("GROQ_API_KEY is not set. Please check your environment variables on Render.")
+    st.stop()
 
 def gaussian_fixer_ui():
     st.title("Gaussian Error Fixer")
