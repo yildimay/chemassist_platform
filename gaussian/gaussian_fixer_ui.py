@@ -3,12 +3,6 @@ import requests
 import difflib
 import os
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-if not GROQ_API_KEY:
-    st.error("GROQ_API_KEY is not set. Please check your environment variables on Render.")
-    st.stop()
-
 def gaussian_fixer_ui():
     st.title("Gaussian Error Fixer")
 
@@ -23,9 +17,9 @@ def gaussian_fixer_ui():
     gjf_content = gjf_file.read().decode("utf-8", errors="ignore")
     log_content = log_file.read().decode("utf-8", errors="ignore")
 
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-    MODEL = "llama3-70b-8192"
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")  # Now it works with Render env vars
+MODEL = "llama3-70b-8192"
 
     def call_groq(prompt):
         headers = {
