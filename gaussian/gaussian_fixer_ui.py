@@ -1,3 +1,5 @@
+# gaussian_fixer_ui.py
+
 import streamlit as st
 from PIL import Image
 import pytesseract
