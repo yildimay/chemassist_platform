@@ -7,4 +7,4 @@ ipywidgets
 ipython-genutils
 numpy
 PyMuPDF
-
+pytesseract
