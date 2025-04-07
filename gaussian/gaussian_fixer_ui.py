@@ -1,67 +1,75 @@
 import streamlit as st
+from PIL import Image
+import pytesseract
 import requests
 import os
 
-def gaussian_fixer_ui():
-    st.title("Gaussian Error Fixer")
-    st.subheader("Upload Files")
+st.set_page_config(page_title="Gaussian Error Fixer Chat", layout="centered")
+st.title("🧠 Gaussian Error Fixer Chat")
 
-    gjf_file = st.file_uploader("Upload broken .gjf file", type=["gjf", "com"])
-    log_file = st.file_uploader("Upload related .log or .out file", type=["log", "out"])
+st.markdown("""
+Welcome to the **Gaussian Error Fixer Chat**.
+- Describe your Gaussian issue in the chatbox below.
+- Optionally, upload a screenshot of the error.
 
-    if not gjf_file or not log_file:
-        st.info("Please upload both a .gjf and a .log/.out file to proceed.")
-        return
+**Note**: Text input is required. Image upload is optional.
+""")
 
-    gjf_content = gjf_file.read().decode("utf-8", errors="ignore")
-    log_content = log_file.read().decode("utf-8", errors="ignore")
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    MODEL = "llama3-70b-8192"
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    if not GROQ_API_KEY:
-        st.error("Missing GROQ_API_KEY! Please set it in your Render Environment tab.")
-        return
+# User input and image upload
+with st.form("chat_form"):
+    user_input = st.text_area("Describe your Gaussian error:", height=100, placeholder="e.g. Link 9999 or SCF not converging...")
+    uploaded_image = st.file_uploader("Optional: Upload error screenshot", type=["png", "jpg", "jpeg"])
+    submitted = st.form_submit_button("Send")
 
-    def call_groq(prompt):
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1000,
-            "temperature": 0.3
-        }
+if submitted:
+    if user_input.strip() == "":
+        st.warning("Text input is required.")
+    else:
+        # Save user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        # Process image if available
+        image_text = ""
+        if uploaded_image is not None:
+            image = Image.open(uploaded_image)
+            image_text = pytesseract.image_to_string(image)
+            st.markdown("*Extracted from image:* \n" + image_text)
+
+        # Combine and process both inputs
+        final_input = user_input + "\n" + image_text
+
+        # Call Groq API
         try:
-            res = requests.post(GROQ_API_URL, headers=headers, json=data)
-            res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"]
+            headers = {
+                "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
+                "Content-Type": "application/json"
+            }
+
+            data = {
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant for fixing Gaussian errors."},
+                    {"role": "user", "content": final_input}
+                ]
+            }
+
+            response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data)
+            response.raise_for_status()
+            ai_response = response.json()['choices'][0]['message']['content']
         except Exception as e:
-            st.error(f"AI request failed: {e}")
-            return None
+            ai_response = f"❌ Error while contacting Groq API: {e}"
 
-    if st.button("Analyze and Fix"):
-        with st.spinner("Analyzing error and generating fix..."):
-            prompt = f"""
-You're a Gaussian expert.
-
-Given the following input file (.gjf) and log file (.log), explain what went wrong and generate a corrected .gjf file.
-
-Input (.gjf):
-{gjf_content}
-
-Log (.log):
-{log_content}
-
-Output ONLY the corrected .gjf file.
-"""
-            response = call_groq(prompt)
-            if response:
-                st.subheader("Fixed .gjf File")
-                st.code(response, language="text")
-                st.download_button("Download Fixed .gjf", response, file_name="fixed_input.gjf", mime="text/plain")
-            else:
-                st.error("Could not generate a fix.")
+        st.session_state.messages.append({"role": "assistant", "content": ai_response})
+        with st.chat_message("assistant"):
+            st.markdown(ai_response)
