@@ -13,8 +13,9 @@ def gaussian_fixer_ui():
     Welcome to the **Gaussian Error Fixer Chat**.
     - Describe your Gaussian issue in the chatbox below.
     - Optionally, upload a screenshot of the error.
+    - Optionally, upload Gaussian input (`.gjf`) and/or output (`.log` / `.out`) files.
 
-    **Note**: Text input is required. Image upload is optional.
+    **Note**: Text input is required. Other inputs are optional.
     """)
 
     # Initialize chat history
@@ -26,10 +27,12 @@ def gaussian_fixer_ui():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # User input and image upload
+    # User input and uploads
     with st.form("chat_form"):
         user_input = st.text_area("Describe your Gaussian error:", height=100, placeholder="e.g. Link 9999 or SCF not converging...")
         uploaded_image = st.file_uploader("Optional: Upload error screenshot", type=["png", "jpg", "jpeg"])
+        uploaded_input_file = st.file_uploader("Optional: Upload Gaussian Input File (.gjf)", type=["gjf"])
+        uploaded_output_file = st.file_uploader("Optional: Upload Gaussian Output File (.log, .out)", type=["log", "out"])
         submitted = st.form_submit_button("Send")
 
     if submitted:
@@ -48,8 +51,16 @@ def gaussian_fixer_ui():
                 image_text = pytesseract.image_to_string(image)
                 st.markdown("*Extracted from image:* \n" + image_text)
 
-            # Combine and process both inputs
-            final_input = user_input + "\n" + image_text
+            # Read file contents
+            input_file_text = ""
+            output_file_text = ""
+            if uploaded_input_file is not None:
+                input_file_text = uploaded_input_file.read().decode("utf-8", errors="ignore")
+            if uploaded_output_file is not None:
+                output_file_text = uploaded_output_file.read().decode("utf-8", errors="ignore")
+
+            # Combine and process all inputs
+            final_input = f"USER MESSAGE:\n{user_input}\n\nIMAGE TEXT:\n{image_text}\n\nINPUT FILE:\n{input_file_text}\n\nOUTPUT FILE:\n{output_file_text}"
 
             # Call Groq API
             try:
@@ -61,7 +72,7 @@ def gaussian_fixer_ui():
                 data = {
                     "model": "llama3-70b-8192",
                     "messages": [
-                        {"role": "system", "content": "You are a helpful assistant for fixing Gaussian errors."},
+                        {"role": "system", "content": "You are a helpful assistant for Gaussian error fixing. If the question is not related to Gaussian software or Gaussian errors, reply with: 'This tool is specifically for Gaussian error fixing. Please ask a Gaussian-related question.'"},
                         {"role": "user", "content": final_input}
                     ]
                 }
