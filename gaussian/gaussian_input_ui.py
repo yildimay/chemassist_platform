@@ -1,99 +1,86 @@
-import streamlit as st
-import os
-import requests
-import json
-from rdkit import Chem
-from rdkit.Chem import AllChem
-import fitz  # PyMuPDF
-
-
-def truncate_structure_input(structure: str, max_chars: int = 3000) -> str:
-    if len(structure) <= max_chars:
-        return structure
-    lines = structure.splitlines()
-    truncated_lines = []
-    total_len = 0
-    for line in lines:
-        if total_len + len(line) > max_chars:
-            break
-        truncated_lines.append(line)
-        total_len += len(line) + 1
-    return "\n".join(truncated_lines) + "\n... [structure truncated for safety]"
-
-
-def smiles_to_xyz(smiles: str) -> str:
-    mol = Chem.MolFromSmiles(smiles)
-    mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    AllChem.UFFOptimizeMolecule(mol)
-    conf = mol.GetConformer()
-    xyz = f"{mol.GetNumAtoms()}\nGenerated from SMILES\n"
-    for atom in mol.GetAtoms():
-        pos = conf.GetAtomPosition(atom.GetIdx())
-        xyz += f"{atom.GetSymbol()} {pos.x:.4f} {pos.y:.4f} {pos.z:.4f}\n"
-    return xyz
-
-
-def extract_text_from_pdf(uploaded_file) -> str:
-    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    text = "\n".join([page.get_text() for page in doc])
-    return text
-
-
-def call_groq_for_gjf_from_paper(smiles_xyz, paper_text):
-    GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-    if not GROQ_API_KEY:
-        raise ValueError("GROQ_API_KEY not set in environment variables.")
-
-    prompt = f"""
-Given the following molecule in XYZ format:
-{truncate_structure_input(smiles_xyz)}
-
-And this paper excerpt:
-{paper_text[:4000]}
-
-Extract the method, basis set, charge, multiplicity, and generate a Gaussian input (.gjf) file. Output only the .gjf content.
-"""
-
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "llama3-70b-8192",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.5
-    }
-
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers=headers,
-        data=json.dumps(payload)
-    )
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
-
+# gaussian_input_ui.py
 
 def gaussian_input_ui():
-    st.title("Gaussian Input from SMILES + Paper")
+    import streamlit as st
+    import base64
+    import requests
+    import os
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
 
-    st.markdown("### Upload SMILES and Reference Paper")
-    smiles = st.text_input("Enter SMILES string")
-    uploaded_pdf = st.file_uploader("Upload reference paper (PDF)", type="pdf")
+    def smiles_to_xyz(smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        mol = Chem.AddHs(mol)
+        AllChem.EmbedMolecule(mol)
+        AllChem.UFFOptimizeMolecule(mol)
+        conf = mol.GetConformer()
+        xyz = ""
+        for atom in mol.GetAtoms():
+            pos = conf.GetAtomPosition(atom.GetIdx())
+            xyz += f"{atom.GetSymbol()} {pos.x:.4f} {pos.y:.4f} {pos.z:.4f}\n"
+        return xyz.strip()
 
-    if st.button("Validate & Generate .gjf from Paper"):
-        if not smiles or not uploaded_pdf:
-            st.warning("Please provide both a SMILES and a paper PDF.")
-            return
+    st.header("🧪 Gaussian Input File Generator")
 
-        try:
-            with st.spinner("Processing paper and molecule..."):
-                xyz_data = smiles_to_xyz(smiles)
-                paper_text = extract_text_from_pdf(uploaded_pdf)
-                gjf_output = call_groq_for_gjf_from_paper(xyz_data, paper_text)
-                st.success(".gjf file generated from SMILES + paper!")
-                st.code(gjf_output, language="gjf")
-                st.download_button("Download .gjf File", data=gjf_output, file_name="generated_input.gjf")
-        except Exception as e:
-            st.error(f"Error: {e}")
+    tabs = st.tabs(["📋 Form-based", "💬 Prompt-based"])
+
+    with tabs[0]:
+        st.subheader("📋 Form-based Generator")
+        smiles = st.text_input("Enter SMILES string:")
+        method = st.selectbox("Select method", ["B3LYP", "HF", "M06-2X", "PBE0"])
+        basis = st.selectbox("Select basis set", ["6-31G(d)", "6-311++G(d,p)", "cc-pVDZ", "LANL2DZ"])
+        job_type = st.selectbox("Job type", ["Opt", "Freq", "SP", "Opt Freq"])
+        charge = st.number_input("Charge", value=0, step=1)
+        multiplicity = st.number_input("Multiplicity", value=1, step=1)
+        custom_route = st.text_input("Optional: Extra route keywords")
+
+        if st.button("Generate .gjf file from SMILES"):
+            coords = smiles_to_xyz(smiles)
+            if coords is None:
+                st.error("Invalid SMILES string. Please check and try again.")
+            else:
+                route_line = f"#{method}/{basis} {job_type} {custom_route}".strip()
+                gjf_content = f"""%chk=calc.chk
+%mem=4GB
+%nprocshared=4
+{route_line}
+
+Generated by ChemAssist
+
+{charge} {multiplicity}
+{coords}
+
+"""
+                st.code(gjf_content, language="gjf")
+                b64 = base64.b64encode(gjf_content.encode()).decode()
+                href = f'<a href="data:file/gjf;base64,{b64}" download="generated_input.gjf">⬇️ Download .gjf file</a>'
+                st.markdown(href, unsafe_allow_html=True)
+
+    with tabs[1]:
+        st.subheader("💬 Prompt-based Generator")
+        prompt = st.text_area("Describe what kind of input file you want:",
+                              placeholder="e.g. Generate a Gaussian input for water molecule optimization using B3LYP/6-31G(d)")
+        if st.button("Generate from prompt") and prompt.strip():
+            try:
+                headers = {
+                    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
+                    "Content-Type": "application/json"
+                }
+                data = {
+                    "model": "llama3-70b-8192",
+                    "messages": [
+                        {"role": "system", "content": "You are a Gaussian input file generator. Output ONLY the .gjf content."},
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+                response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data)
+                response.raise_for_status()
+                ai_content = response.json()['choices'][0]['message']['content']
+                st.code(ai_content, language="gjf")
+                b64 = base64.b64encode(ai_content.encode()).decode()
+                href = f'<a href="data:file/gjf;base64,{b64}" download="ai_generated_input.gjf">⬇️ Download .gjf file</a>'
+                st.markdown(href, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error: {e}")
