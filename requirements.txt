@@ -6,5 +6,5 @@ python-dotenv
 ipywidgets
 ipython-genutils
 numpy
-PyMuPDF
+PyPDF2
 pytesseract
