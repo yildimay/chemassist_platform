@@ -20,7 +20,7 @@ selected_module = st.sidebar.radio(
 if selected_module == "Gaussian":
     gaussian_tool = st.sidebar.radio("Gaussian Tool", ["Error Fixer", "Input Creator"])
     if gaussian_tool == "Error Fixer":
-        gaussian/gaussian_fixer_ui()
+        gaussian_fixer_ui()
     elif gaussian_tool == "Input Creator":
         gaussian_input_ui()
 
