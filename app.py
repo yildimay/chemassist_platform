@@ -1,4 +1,9 @@
 import streamlit as st
+st.set_page_config(
+    page_title="Chem Assist",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 from gaussian.gaussian_fixer_ui import gaussian_fixer_ui
 from gaussian.gaussian_input_ui import gaussian_input_ui
 from smiles_to_mol import smiles_ui
