@@ -8,3 +8,4 @@ ipython-genutils
 numpy
 PyPDF2
 pytesseract
+openai>=0.27.0
