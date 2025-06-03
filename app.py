@@ -29,3 +29,5 @@ elif selected_module == "VASP (coming soon)":
 
 elif selected_module == "GROMACS (coming soon)":
     st.markdown("### GROMACS module is under development.")
+elif choice == "Environmental Hazard Panel":
+    env_hazard_panel.main()
