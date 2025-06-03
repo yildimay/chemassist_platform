@@ -30,70 +30,110 @@ elif selected_module == "VASP (coming soon)":
 elif selected_module == "GROMACS (coming soon)":
     st.markdown("### GROMACS module is under development.")
     
+# env_hazard_panel.py
+
 import streamlit as st
 from rdkit import Chem
+from rdkit.Chem.Draw import rdMolDraw2D
 
-st.sidebar.title("Modüller")
-secim = st.sidebar.radio("Hangi modülü kullanmak istiyorsun?", 
-                         ["Gaussian Fixer", "DFT Yardımcısı", "Çevresel Risk Değerlendirmesi", "..."])
+def draw_molecule(mol, width=300, height=200):
+    """
+    Draw an RDKit molecule as SVG and render it in Streamlit.
+    """
+    drawer = rdMolDraw2D.MolDraw2DSVG(width, height)
+    rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol)
+    drawer.FinishDrawing()
+    svg = drawer.GetDrawingText().replace('svg:', '')
+    st.write(f'<div>{svg}</div>', unsafe_allow_html=True)
 
-if secim == "Çevresel Risk Değerlendirmesi":
-    st.header("Molekülün Çevresel Tehlike Paneli")
+def calculate_physicochemical_properties(smiles):
+    """
+    Stub function for later: compute molecular weight, logP, TPSA, etc.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {}
+    from rdkit.Chem import Descriptors
+    return {
+        "Molecular Weight": round(Descriptors.MolWt(mol), 2),
+        "logP": round(Descriptors.MolLogP(mol), 2),
+        "TPSA": round(Descriptors.TPSA(mol), 2),
+        # Add more properties later...
+    }
 
-    # 1. Molekül Girişi
-    smiles_input = st.text_input("Molekül SMILES girin:", value="")
-    file_input = st.file_uploader("Veya .mol/.sdf dosyası yükleyin:", type=["mol", "sdf"])
-    
-    # SMILES ve dosya kontrolü
-    mol_obj = None
-    if smiles_input:
-        mol_obj = Chem.MolFromSmiles(smiles_input)
-    elif file_input:
-        mol_obj = Chem.MolFromMolBlock(file_input.read().decode("utf-8"))
-    
-    if mol_obj:
-        st.subheader("Molekül Görünümü")
-        from rdkit.Chem.Draw import rdMolDraw2D
-        drawer = rdMolDraw2D.MolDraw2DSVG(300, 200)
-        rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol_obj)
-        drawer.FinishDrawing()
-        svg = drawer.GetDrawingText().replace('svg:','')
-        st.write(f'<div>{svg}</div>', unsafe_allow_html=True)
-        
-        # 2. Fizikokimyasal Özellik Hesabı
-        props = hesapla_fiziksel_kimyasal(smiles_input)
-        st.subheader("Fizikokimyasal Özellikler")
-        st.table(props)
-        
-        # 3. Ekotoksisite ve Biyobirikim Tahmini
-        with st.spinner("Ekotoksisite parametreleri hesaplanıyor..."):
-            # Örneğin, PubChem ECOSAR sorgusu veya T.E.S.T. çağrısı
-            # Örnek placeholder:
-            ecosar = get_ecosar_classification(cids=[...])  # önce CID almanız lazım
-            st.subheader("ECOSAR Sınıflandırması")
-            if ecosar:
-                st.json(ecosar)
+def main():
+    st.set_page_config(page_title="Chem Assist", layout="wide")
+    st.sidebar.title("Tools")
+    choice = st.sidebar.radio(
+        "Select a module:",
+        ["Gaussian Fixer", "DFT Helper", "Environmental Hazard Panel", "Other Modules…"]
+    )
+
+    if choice == "Environmental Hazard Panel":
+        st.header("Environmental Hazard Panel")
+        st.write(
+            "Upload your molecule below (SMILES or .mol/.sdf). "
+            "We’ll visualize it and, in the next step, compute key properties and risk indicators."
+        )
+
+        # --- 1. Molecule Input ---
+        smiles_input = st.text_input("Enter molecule SMILES string:", "")
+        file_input = st.file_uploader("Or upload a .mol / .sdf file:", type=["mol", "sdf"])
+
+        mol_obj = None
+        if smiles_input:
+            mol_obj = Chem.MolFromSmiles(smiles_input)
+            if mol_obj is None:
+                st.error("Invalid SMILES string. Please check your input.")
+        elif file_input is not None:
+            try:
+                block = file_input.read().decode("utf-8")
+                mol_obj = Chem.MolFromMolBlock(block)
+                if mol_obj is None:
+                    st.error("Could not parse the uploaded file. Make sure it’s a valid .mol or .sdf.")
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+
+        # --- 2. Display Molecule Structure ---
+        if mol_obj is not None:
+            st.subheader("Molecule Structure")
+            draw_molecule(mol_obj)
+
+            # --- 3. Placeholder: Basic Properties ---
+            st.subheader("Physicochemical Properties (preliminary)")
+            props = calculate_physicochemical_properties(smiles_input if smiles_input else "")
+            if props:
+                st.table(props)
             else:
-                st.write("ECOSAR verisi bulunamadı.")
-            
-            # EPI Suite tahminleri
-            # episuite_results = run_episuitemodule(smiles_input, module_name="BCFBAF")
-            # st.write("Biyobirikim Katsayısı (BCF):", episuite_results["BCF"])
-        
-        # 4. Risk Skoru & Renkli Uyarı
-        st.subheader("Çevresel Risk Skoru")
-        # Örnek: basitçe logP > 4 ve BCF > 5000 ise “Yüksek Risk”
-        # Detaylı hesaplama buraya geliyor
-        risk_skoru = 0  # placeholder
-        uyarı_metni = ""
-        if props["logP"] > 4:
-            risk_skoru += 50
-            uyarı_metni = "Yüksek biyobirikim potansiyeli"
-        # ... diğer kurallar eklenebilir ...
-        st.metric(label="Risk Skoru (0–100)", value=f"{risk_skoru}", delta=None)
-        if risk_skoru > 75:
-            st.error("Bu molekül çevre için yüksek risk taşıyor!")
-        elif risk_skoru > 40:
-            st.warning("Orta düzeyde çevresel risk.")
-        else:
-            st.success("Düşük çevresel risk.")
+                st.write("Properties will appear here once a valid molecule is provided.")
+
+            # --- 4. Placeholder: Environmental Risk Calculations ---
+            st.subheader("Environmental Risk Indicators")
+            st.write(
+                "⚙️ Calculation modules (ECOSAR, BCF, LC₅₀, etc.) will go here. "
+                "For now, this section is under construction."
+            )
+
+            # Example placeholder graphics area—fill in later
+            st.info("Graphical risk profiles will be plotted here in a future iteration.")
+
+            # --- 5. Placeholder: Risk Score ---
+            st.subheader("Overall Risk Score")
+            st.write("Risk score computation coming soon…")
+
+            # (Later: implement “Download Report” button)
+            st.download_button(
+                label="Download Full Report (PDF/JSON)",
+                data=None,
+                file_name="env_risk_report.pdf",
+                mime="application/pdf",
+                disabled=True
+            )
+
+    else:
+        # Handle other modules or show a placeholder
+        st.write(f"You selected: **{choice}**")
+        st.write("This module is not implemented yet in this prototype.")
+
+if __name__ == "__main__":
+    main()
