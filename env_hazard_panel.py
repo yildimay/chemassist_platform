@@ -35,13 +35,7 @@ def calculate_physicochemical_properties(mol):
 def query_groq_toxicity(smiles: str) -> dict | None:
     """
     Send a prompt to a Groq-hosted LLM (e.g., a fine-tuned LLaMA3-70B) that predicts
-    Fish LC50, Daphnia EC50, and Algae EC50 in mg/L. Returns a dict:
-      {
-        "fish_lc50_mg_L": float,
-        "daphnia_ec50_mg_L": float,
-        "algae_ec50_mg_L": float
-      }
-    or None on error.
+    Fish LC50, Daphnia EC50, and Algae EC50 in mg/L. Returns a dict or None on error.
     """
     groq_api_url = "https://api.groq.example.com/v1/completions"  # <-- replace with your actual Groq endpoint
     api_key = os.getenv("GROQ_API_KEY")
@@ -49,7 +43,6 @@ def query_groq_toxicity(smiles: str) -> dict | None:
         st.error("GROQ_API_KEY environment variable not set.")
         return None
 
-    # Construct prompt to elicit JSON output from the LLM
     prompt = (
         f"SMILES: {smiles}\n"
         "Predict the following endpoints in mg/L (numbers only) and return valid JSON:\n"
@@ -77,7 +70,7 @@ def query_groq_toxicity(smiles: str) -> dict | None:
         resp.raise_for_status()
         result = resp.json()
         text = result["choices"][0]["text"].strip()
-        # Ensure we reconstruct valid JSON if stop sequence removed the closing brace
+        # Ensure a closing brace if the stop token cut it off
         if not text.endswith("}"):
             text = text + "}"
         preds = json.loads(text)
@@ -89,10 +82,10 @@ def query_groq_toxicity(smiles: str) -> dict | None:
 def calculate_risk_score(props: dict, preds: dict) -> int:
     """
     Simple heuristic-based risk scoring:
-      - +30 points if logP ≥ 4.0 (bioaccumulation concern)
-      - +30 points if Fish LC50 ≤ 1 mg/L (high acute fish toxicity)
-      - +20 points if Daphnia EC50 ≤ 1 mg/L (aquatic invertebrate toxicity)
-      - +20 points if Algae EC50 ≤ 1 mg/L (aquatic plant toxicity)
+      - +30 if logP ≥ 4.0
+      - +30 if Fish LC50 ≤ 1 mg/L
+      - +20 if Daphnia EC50 ≤ 1 mg/L
+      - +20 if Algae EC50 ≤ 1 mg/L
     Caps at 100.
     """
     score = 0
@@ -102,17 +95,17 @@ def calculate_risk_score(props: dict, preds: dict) -> int:
     if logp is not None and logp >= 4.0:
         score += 30
 
-    # 2) Fish toxicity
+    # 2) Fish acute toxicity
     fish_val = preds.get("fish_lc50_mg_L")
     if fish_val is not None and fish_val <= 1.0:
         score += 30
 
-    # 3) Daphnia toxicity
+    # 3) Daphnia acute toxicity
     daph_val = preds.get("daphnia_ec50_mg_L")
     if daph_val is not None and daph_val <= 1.0:
         score += 20
 
-    # 4) Algae toxicity
+    # 4) Algae acute toxicity
     algae_val = preds.get("algae_ec50_mg_L")
     if algae_val is not None and algae_val <= 1.0:
         score += 20
@@ -120,15 +113,15 @@ def calculate_risk_score(props: dict, preds: dict) -> int:
     return min(score, 100)
 
 def main():
-    st.set_page_config(page_title="Chem Assist: Environmental Hazard (Groq)", layout="wide")
+    # **NO** st.set_page_config(...) here!
     st.header("Environmental Hazard Panel (Groq-Powered QSAR)")
     st.write(
-        "Upload a molecule (as SMILES or a .mol/.sdf file) to visualize its structure, "
+        "Upload a molecule (SMILES or .mol/.sdf) to visualize its structure, "
         "compute basic physicochemical properties, and obtain ecotoxicity predictions "
-        "from a Groq-hosted LLM model."
+        "from a Groq-hosted LLM."
     )
 
-    # --- Molecule Input ---
+    # --- 1) Molecule Input ---
     smiles_input = st.text_input("Enter SMILES string:", "")
     file_input = st.file_uploader("Or upload a .mol / .sdf file:", type=["mol", "sdf"])
 
@@ -155,25 +148,25 @@ def main():
         st.info("Awaiting a valid molecule to analyze…")
         return
 
-    # --- Molecule Drawing ---
+    # --- 2) Draw the Molecule ---
     st.subheader("Molecule Structure")
     draw_molecule(mol_obj)
 
-    # --- Physicochemical Properties ---
+    # --- 3) Basic RDKit Properties ---
     st.subheader("Physicochemical Properties")
     props = calculate_physicochemical_properties(mol_obj)
     st.table(props)
 
-    # --- Groq-Based Toxicity Predictions ---
+    # --- 4) Query Groq for Toxicity Predictions ---
     st.subheader("Groq LLM Toxicity Predictions")
-    with st.spinner("Sending SMILES to Groq model for toxicity predictions…"):
+    with st.spinner("Sending SMILES to Groq model…"):
         preds = query_groq_toxicity(actual_smiles)
 
     if preds is None:
         st.warning("No toxicity predictions returned. Please check your Groq setup or input.")
         return
 
-    # Display the predicted endpoints in a table
+    # Display the three predicted endpoints
     fish_val = preds.get("fish_lc50_mg_L", "N/A")
     daph_val = preds.get("daphnia_ec50_mg_L", "N/A")
     algae_val = preds.get("algae_ec50_mg_L", "N/A")
@@ -184,7 +177,7 @@ def main():
     }
     st.table(tox_table)
 
-    # --- Overall Risk Score ---
+    # --- 5) Compute & Show Overall Risk Score ---
     st.subheader("Overall Risk Score")
     score = calculate_risk_score(props, preds)
     if score >= 75:
@@ -200,7 +193,7 @@ def main():
     st.metric(label="Risk Score (0–100)", value=f"{score}", delta_color=delta_color)
     st.write(interpretation)
 
-    # --- Download Report ---
+    # --- 6) Download Full Report ---
     st.subheader("Download Full Report")
     report_data = {
         "SMILES": actual_smiles,
@@ -218,6 +211,3 @@ def main():
         file_name="env_toxicity_report.json",
         mime="application/json"
     )
-
-if __name__ == "__main__":
-    main()
