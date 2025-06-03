@@ -1,5 +1,5 @@
 import streamlit as st
-from gaussian import gaussian_fixer_ui, gaussian_input_ui
+from gaussian import gaussian_fixer_ui , gaussian_input_ui
 from smiles_to_mol import smiles_ui
 from env_hazard_panel import main as hazard_ui   # import your panel
 
