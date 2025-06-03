@@ -37,7 +37,7 @@ def query_groq_toxicity(smiles: str) -> dict | None:
     Send a prompt to a Groq-hosted LLM (e.g., a fine-tuned LLaMA3-70B) that predicts
     Fish LC50, Daphnia EC50, and Algae EC50 in mg/L. Returns a dict or None on error.
     """
-    groq_api_url = "https://api.groq.example.com/v1/completions"  # <-- replace with your actual Groq endpoint
+    groq_api_url = "https://api.groq.com/openai/v1/chat/completions"  # <-- replace with your actual Groq endpoint
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         st.error("GROQ_API_KEY environment variable not set.")
