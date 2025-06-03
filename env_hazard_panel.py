@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ─── Configure OpenAI client (point to Groq) ─────────────────────────────────
-openai.api_key  = os.getenv("OPENAI_API_KEY")
+openai.api_key  = os.getenv("GROQ_API_KEY")
 openai.api_base = os.getenv("OPENAI_API_BASE", "https://api.groq.com/openai")
 
 def draw_molecule(mol, width=300, height=200):
