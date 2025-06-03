@@ -12,7 +12,7 @@ st.set_page_config(page_title="ChemAssist Platform", layout="wide")
 
 # Sidebar module selection
 st.sidebar.title("ChemAssist Modules")
-selected_module = st.sidebar.selectbox("Choose a tool:", ["Gaussian", "Molecule Builder", "VASP (coming soon)", "GROMACS (coming soon)"])
+selected_module = st.sidebar.selectbox("Choose a tool:", ["Gaussian", "Molecule Builder", "VASP (coming soon)", "GROMACS (coming soon)", "Environmental Hazard Panel"])
 
 if selected_module == "Gaussian":
     gaussian_tool = st.sidebar.radio("Gaussian Tool", ["Error Fixer", "Input Creator"])
