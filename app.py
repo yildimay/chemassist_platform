@@ -1,17 +1,20 @@
 import streamlit as st
+
+# Page config
 st.set_page_config(
     page_title="Chem Assist",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Imports
 from gaussian.gaussian_fixer_ui import gaussian_fixer_ui
 from gaussian.gaussian_input_ui import gaussian_input_ui
 from smiles_to_mol import smiles_ui
 from env_hazard_panel import main as hazard_ui
 from modules.gromacs_mdp_generator import generate_em_mdp
 
-# … any other imports …
-
+# Sidebar module selection
 selected_module = st.sidebar.radio(
     "Select a module:",
     [
@@ -23,6 +26,9 @@ selected_module = st.sidebar.radio(
     ]
 )
 
+# ========== MODULE LOGIC ==========
+
+# Gaussian module
 if selected_module == "Gaussian":
     gaussian_tool = st.sidebar.radio("Select Tool", ["Error Fixer", "Input Creator"])
     if gaussian_tool == "Error Fixer":
@@ -30,35 +36,38 @@ if selected_module == "Gaussian":
     elif gaussian_tool == "Input Creator":
         gaussian_input_ui()
 
+# Molecule builder
 elif selected_module == "Molecule Builder":
     smiles_ui()
 
+# Environmental hazard panel
 elif selected_module == "Environmental Hazard Panel":
     hazard_ui()
 
+# VASP placeholder
 elif selected_module == "VASP (coming soon)":
     st.markdown("### VASP module is under development.")
 
+# GROMACS module
 elif selected_module == "GROMACS":
-      gromacs_tool = st.sidebar.radio("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
+    st.header("🧬 GROMACS Tools")
+
+    gromacs_tool = st.sidebar.radio("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
+
     if gromacs_tool == "MDP Generator":
         gsub_tool = st.selectbox("Select Stage", ["Energy Minimization", "NVT", "NPT", "Production"])
 
-            if gsub_tool == "Energy Minimization":
-                generate_em_mdp()
-            if gsub_tool == "NVT":
-                st.markdown("### this tool is under development.")
-            if gsub_tool == "NPT":
-                st.markdown("### this tool is under development.")
-            if gsub_tool == "Production":
-                st.markdown("### this tool is under development.")
+        if gsub_tool == "Energy Minimization":
+            generate_em_mdp()
+        elif gsub_tool == "NVT":
+            st.markdown("### NVT generator is under development.")
+        elif gsub_tool == "NPT":
+            st.markdown("### NPT generator is under development.")
+        elif gsub_tool == "Production":
+            st.markdown("### Production MD generator is under development.")
 
+    elif gromacs_tool == "Error Fixer":
+        st.markdown("### GROMACS error fixer is under development.")
 
-
-if selected_module == "GROMACS":
-    st.header("GROMACS Tools")
-
-    selected_tool = st.selectbox("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
-
-   
-        # Next up: add similar generators for NVT, NPT, etc.
+    elif gromacs_tool == "Simulation Builder":
+        st.markdown("### Simulation builder coming soon.")
