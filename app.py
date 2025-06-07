@@ -41,3 +41,18 @@ elif selected_module == "VASP (coming soon)":
 
 elif selected_module == "GROMACS (coming soon)":
     st.markdown("### GROMACS module is under development.")
+
+
+from modules.gromacs_mdp_generator import generate_em_mdp
+
+if selected_software == "GROMACS":
+    st.header("GROMACS Tools")
+
+    selected_tool = st.selectbox("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
+
+    if selected_tool == "MDP Generator":
+        sim_stage = st.selectbox("Select Stage", ["Energy Minimization", "NVT", "NPT", "Production"])
+
+        if sim_stage == "Energy Minimization":
+            generate_em_mdp()
+        # Next up: add similar generators for NVT, NPT, etc.
