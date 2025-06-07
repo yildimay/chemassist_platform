@@ -40,18 +40,18 @@ elif selected_module == "VASP (coming soon)":
     st.markdown("### VASP module is under development.")
 
 elif selected_module == "GROMACS":
-    gromacs_tool = st.sidebar.radio("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
-     if gromacs_tool == "MDP Generator":
+      gromacs_tool = st.sidebar.radio("Select Tool", ["MDP Generator", "Error Fixer", "Simulation Builder"])
+    if gromacs_tool == "MDP Generator":
         gsub_tool = st.selectbox("Select Stage", ["Energy Minimization", "NVT", "NPT", "Production"])
 
-        if gsub_tool == "Energy Minimization":
-            generate_em_mdp()
-        if gsub_tool == "NVT":
-            st.markdown("### this tool is under development.")
-        if gsub_tool == "NPT":
-            st.markdown("### this tool is under development.")
-        if gsub_tool == "Production":
-            st.markdown("### this tool is under development.")
+            if gsub_tool == "Energy Minimization":
+                generate_em_mdp()
+            if gsub_tool == "NVT":
+                st.markdown("### this tool is under development.")
+            if gsub_tool == "NPT":
+                st.markdown("### this tool is under development.")
+            if gsub_tool == "Production":
+                st.markdown("### this tool is under development.")
 
 
 
