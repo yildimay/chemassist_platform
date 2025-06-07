@@ -12,7 +12,12 @@ from gaussian.gaussian_fixer_ui import gaussian_fixer_ui
 from gaussian.gaussian_input_ui import gaussian_input_ui
 from smiles_to_mol import smiles_ui
 from env_hazard_panel import main as hazard_ui
-from modules.gromacs_mdp_generator import generate_em_mdp
+from modules.gromacs_mdp_generator import (
+    generate_em_mdp,
+    generate_nvt_mdp,
+    generate_npt_mdp,
+    generate_md_mdp
+)
 
 # Sidebar module selection
 selected_module = st.sidebar.radio(
@@ -60,11 +65,11 @@ elif selected_module == "GROMACS":
         if gsub_tool == "Energy Minimization":
             generate_em_mdp()
         elif gsub_tool == "NVT":
-            st.markdown("### NVT generator is under development.")
+            generate_nvt_mdp()
         elif gsub_tool == "NPT":
-            st.markdown("### NPT generator is under development.")
+            generate_npt_mdp()
         elif gsub_tool == "Production":
-            st.markdown("### Production MD generator is under development.")
+            generate_md_mdp()
 
     elif gromacs_tool == "Error Fixer":
         st.markdown("### GROMACS error fixer is under development.")
