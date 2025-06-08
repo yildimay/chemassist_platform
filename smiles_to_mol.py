@@ -6,13 +6,11 @@ from rdkit.Chem.rdmolfiles import MolToMolBlock, MolToXYZBlock
 import streamlit.components.v1 as components
 from PIL import Image
 import io
-import fitz  # PyMuPDF
-import re
 
 def render_3d_molecule(mol):
     try:
         mol_block = MolToMolBlock(mol)
-        mol_block = mol_block.replace("\n", "\\n")  # preserve formatting for JS
+        mol_block = mol_block.replace("\n", "\\n")
         viewer_html = f""
         <div style='height: 500px; width: 100%; position: relative;'>
         <script src='https://3Dmol.csb.pitt.edu/build/3Dmol-min.js'></script>
@@ -35,7 +33,6 @@ def smiles_ui():
 
     st.markdown("### 📩 Input")
     smiles = st.text_input("Enter SMILES string:", "")
-
     display_mode = st.radio("Display Mode", ["2D Viewer", "3D Viewer", "XYZ Coordinates"])
 
     if st.button("Convert to MOL") and smiles:
@@ -46,8 +43,6 @@ def smiles_ui():
                 return
 
             mol = Chem.AddHs(mol)
-
-            # Try multiple embedding methods
             embedded = False
             for method in [AllChem.ETKDG(), AllChem.ETKDGv2(), AllChem.ETKDGv3()]:
                 if AllChem.EmbedMolecule(mol, method) == 0:
@@ -57,7 +52,6 @@ def smiles_ui():
             if not embedded:
                 raise ValueError("3D embedding failed.")
 
-            # Soft optimization
             try:
                 AllChem.UFFOptimizeMolecule(mol, maxIters=100)
             except:
@@ -68,29 +62,29 @@ def smiles_ui():
                 except:
                     raise ValueError("3D optimization with UFF and MMFF failed.")
 
-            # Show outputs
             if display_mode == "XYZ Coordinates":
                 xyz_data = MolToXYZBlock(mol)
                 st.text_area("XYZ Coordinates", value=xyz_data, height=300)
-
             elif display_mode == "2D Viewer":
                 mol_2d = Chem.MolFromSmiles(smiles)
                 img = Draw.MolToImage(mol_2d, size=(400, 400))
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 st.image(buf.getvalue(), caption="2D Structure")
-
             elif display_mode == "3D Viewer":
                 render_3d_molecule(mol)
 
         except Exception as e:
             st.error(f"3D optimization failed: {e}")
 
+    # --- PDF Extraction Section ---
     st.markdown("---")
     st.header("📄 Extract Molecule from Research Paper (PDF)")
     pdf_file = st.file_uploader("Upload a PDF research paper:", type=["pdf"])
 
     if pdf_file is not None:
+        import fitz  # PyMuPDF
+        import re
         text = ""
         try:
             with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -107,9 +101,8 @@ def smiles_ui():
         molecule_names = find_molecule_names(text)
 
         if molecule_names:
-            st.success(f"Possible molecule names detected: {', '.join(molecule_names)}")
-
-            selected_name = st.selectbox("Select a molecule to generate structure:", molecule_names)
+            st.success(f"Detected molecule names: {', '.join(molecule_names)}")
+            selected_name = st.selectbox("Select a molecule:", molecule_names)
 
             if st.button("Fetch Structure from PubChem"):
                 try:
