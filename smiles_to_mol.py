@@ -13,7 +13,7 @@ def render_3d_molecule(mol):
     try:
         mol_block = MolToMolBlock(mol)
         mol_block = mol_block.replace("\n", "\\n")  # preserve formatting for JS
-        viewer_html = f"""
+        viewer_html = f""
         <div style='height: 500px; width: 100%; position: relative;'>
         <script src='https://3Dmol.csb.pitt.edu/build/3Dmol-min.js'></script>
         <div id='viewer' style='height: 100%; width: 100%;'></div>
