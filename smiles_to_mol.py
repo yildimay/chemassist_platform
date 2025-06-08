@@ -1,11 +1,13 @@
 import streamlit as st
+import requests
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw
 from rdkit.Chem.rdmolfiles import MolToMolBlock, MolToXYZBlock
 import streamlit.components.v1 as components
 from PIL import Image
 import io
-
+import fitz  # PyMuPDF
+import re
 
 def render_3d_molecule(mol):
     try:
@@ -23,11 +25,10 @@ def render_3d_molecule(mol):
             viewer.render();
         </script>
         </div>
-        """
+        ""
         components.html(viewer_html, height=500)
     except Exception as e:
         st.error(f"Failed to render 3D model: {e}")
-
 
 def smiles_ui():
     st.title("🧬 SMILES to MOL Converter")
@@ -84,3 +85,50 @@ def smiles_ui():
 
         except Exception as e:
             st.error(f"3D optimization failed: {e}")
+
+    st.markdown("---")
+    st.header("📄 Extract Molecule from Research Paper (PDF)")
+    pdf_file = st.file_uploader("Upload a PDF research paper:", type=["pdf"])
+
+    if pdf_file is not None:
+        text = ""
+        try:
+            with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
+                for page in doc:
+                    text += page.get_text()
+        except Exception as e:
+            st.error(f"PDF reading error: {e}")
+
+        def find_molecule_names(text):
+            candidates = re.findall(r"\b([A-Z][a-z]+[a-z0-9\-() ]{2,})\b", text)
+            filtered = [name for name in candidates if len(name.split()) < 4 and any(c.isdigit() for c in name)]
+            return list(set(filtered))
+
+        molecule_names = find_molecule_names(text)
+
+        if molecule_names:
+            st.success(f"Possible molecule names detected: {', '.join(molecule_names)}")
+
+            selected_name = st.selectbox("Select a molecule to generate structure:", molecule_names)
+
+            if st.button("Fetch Structure from PubChem"):
+                try:
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{selected_name}/property/IsomericSMILES/TXT"
+                    response = requests.get(url)
+                    if response.status_code == 200:
+                        extracted_smiles = response.text.strip()
+                        mol = Chem.MolFromSmiles(extracted_smiles)
+                        mol = Chem.AddHs(mol)
+                        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+                        AllChem.UFFOptimizeMolecule(mol)
+                        mol_block = MolToMolBlock(mol)
+                        st.download_button("Download .mol file", mol_block, file_name=f"{selected_name}.mol")
+                        st.info(f"SMILES used: {extracted_smiles}")
+                        if display_mode == "3D Viewer":
+                            render_3d_molecule(mol)
+                    else:
+                        st.error("Could not fetch SMILES from PubChem.")
+                except Exception as e:
+                    st.error(f"Error fetching structure: {e}")
+        else:
+            st.warning("No molecule names detected in the PDF.")
