@@ -18,7 +18,7 @@ from modules.gromacs_mdp_generator import (
     generate_npt_mdp,
     generate_md_mdp
 )
-from modules.gromacs_error_fixer_ai import gromacs_error_fixer_ai
+from modules.gromacs_error_fixer_ai import gromacs_error_fixer_ai_ui
 
 # Sidebar module selection
 selected_module = st.sidebar.radio(
@@ -73,7 +73,7 @@ elif selected_module == "GROMACS":
             generate_md_mdp()
 
     elif gromacs_tool == "Error Fixer":
-            gromacs_error_fixer_ai()
+            gromacs_error_fixer_ai_ui()
 
     elif gromacs_tool == "Simulation Builder":
         st.markdown("### Simulation builder coming soon.")
