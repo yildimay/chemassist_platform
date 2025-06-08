@@ -1,83 +1,127 @@
-# 📁 modules/gromacs_fixer_ui.py
 import streamlit as st
-from PIL import Image
-import pytesseract
 import requests
-import os
+from rdkit import Chem
+from rdkit.Chem import AllChem, Draw
+from rdkit.Chem.rdmolfiles import MolToMolBlock, MolToXYZBlock
+import streamlit.components.v1 as components
+from PIL import Image
+import io
 
-def gromacs_fixer_ui():
-    st.header("🧠 GROMACS Error Fixer Chat")
+def render_3d_molecule(mol):
+    try:
+        mol_block = MolToMolBlock(mol)
+        mol_block = mol_block.replace("\n", "\\n")
+        viewer_html = """
+        <div style='height: 500px; width: 100%; position: relative;'>
+        <script src='https://3Dmol.csb.pitt.edu/build/3Dmol-min.js'></script>
+        <div id='viewer' style='height: 100%; width: 100%;'></div>
+        <script>
+            let viewer = $3Dmol.createViewer("viewer", {backgroundColor: "white"});
+            viewer.addModel(""" + mol_block + """, "mol");
+            viewer.setStyle({}, {stick: {}});
+            viewer.zoomTo();
+            viewer.render();
+        </script>
+        </div>
+        """
+        components.html(viewer_html, height=500)
+    except Exception as e:
+        st.error(f"Failed to render 3D model: {e}")
 
-    st.markdown("""
-    Welcome to the **GROMACS Error Fixer Chat**.
-    - Describe your GROMACS issue in the chatbox below.
-    - Optionally, upload a screenshot of the error.
-    - Optionally, upload relevant GROMACS files (`.mdp`, `.gro`, `.log`, `.tpr`).
+def smiles_ui():
+    st.title("🧬 SMILES to MOL Converter")
 
-    **Note**: Text input is required. Other inputs are optional.
-    """)
+    st.markdown("### 📩 Input")
+    smiles = st.text_input("Enter SMILES string:", "")
+    display_mode = st.radio("Display Mode", ["2D Viewer", "3D Viewer", "XYZ Coordinates"])
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    if st.button("Convert to MOL") and smiles:
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                st.error("❌ Invalid SMILES string.")
+                return
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            mol = Chem.AddHs(mol)
+            embedded = False
+            for method in [AllChem.ETKDG(), AllChem.ETKDGv2(), AllChem.ETKDGv3()]:
+                if AllChem.EmbedMolecule(mol, method) == 0:
+                    embedded = True
+                    break
 
-    with st.form("gromacs_chat_form"):
-        user_input = st.text_area("Describe your GROMACS error:", height=100, placeholder="e.g. LINCS WARNING, unstable pressure...")
-        uploaded_image = st.file_uploader("Optional: Upload error screenshot", type=["png", "jpg", "jpeg"])
-        uploaded_mdp = st.file_uploader("Optional: Upload MDP file (.mdp)", type=["mdp"])
-        uploaded_log = st.file_uploader("Optional: Upload log file (.log)", type=["log"])
-        uploaded_gro = st.file_uploader("Optional: Upload GRO file (.gro)", type=["gro"])
-        submitted = st.form_submit_button("Send")
-
-    if submitted:
-        if user_input.strip() == "":
-            st.warning("Text input is required.")
-        else:
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            with st.chat_message("user"):
-                st.markdown(user_input)
-
-            image_text = ""
-            if uploaded_image:
-                image = Image.open(uploaded_image)
-                image_text = pytesseract.image_to_string(image)
-                st.markdown("*Extracted from image:*\n" + image_text)
-
-            mdp_text = uploaded_mdp.read().decode("utf-8", errors="ignore") if uploaded_mdp else ""
-            log_text = uploaded_log.read().decode("utf-8", errors="ignore") if uploaded_log else ""
-            gro_text = uploaded_gro.read().decode("utf-8", errors="ignore") if uploaded_gro else ""
-
-            full_input = f"USER TEXT:\n{user_input}\n\nIMAGE TEXT:\n{image_text}\n\nMDP FILE:\n{mdp_text}\n\nLOG FILE:\n{log_text}\n\nGRO FILE:\n{gro_text}"
+            if not embedded:
+                raise ValueError("3D embedding failed.")
 
             try:
-                headers = {
-                    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-                    "Content-Type": "application/json"
-                }
+                AllChem.UFFOptimizeMolecule(mol, maxIters=100)
+            except:
+                try:
+                    props = AllChem.MMFFGetMoleculeProperties(mol)
+                    ff = AllChem.MMFFGetMoleculeForceField(mol, props)
+                    ff.Minimize(maxIts=150)
+                except:
+                    raise ValueError("3D optimization with UFF and MMFF failed.")
 
-                data = {
-                    "model": "llama3-70b-8192",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": """
-You are a GROMACS error fixer. Only answer GROMACS-related questions.
-If the message is unrelated, respond: 'This tool is for GROMACS troubleshooting only. Please provide a GROMACS-related error or file.'
-"""
-                        },
-                        {"role": "user", "content": full_input}
-                    ]
-                }
+            if display_mode == "XYZ Coordinates":
+                xyz_data = MolToXYZBlock(mol)
+                st.text_area("XYZ Coordinates", value=xyz_data, height=300)
+            elif display_mode == "2D Viewer":
+                mol_2d = Chem.MolFromSmiles(smiles)
+                img = Draw.MolToImage(mol_2d, size=(400, 400))
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                st.image(buf.getvalue(), caption="2D Structure")
+            elif display_mode == "3D Viewer":
+                render_3d_molecule(mol)
 
-                response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data)
-                response.raise_for_status()
-                ai_response = response.json()['choices'][0]['message']['content']
-            except Exception as e:
-                ai_response = f"\u274c Error while contacting Groq API: {e}"
+        except Exception as e:
+            st.error(f"3D optimization failed: {e}")
 
-            st.session_state.messages.append({"role": "assistant", "content": ai_response})
-            with st.chat_message("assistant"):
-                st.markdown(ai_response)
+    # --- PDF Extraction Section ---
+    st.markdown("---")
+    st.header("📄 Extract Molecule from Research Paper (PDF)")
+    pdf_file = st.file_uploader("Upload a PDF research paper:", type=["pdf"])
+
+    if pdf_file is not None:
+        import fitz  # PyMuPDF
+        import re
+        text = ""
+        try:
+            with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
+                for page in doc:
+                    text += page.get_text()
+        except Exception as e:
+            st.error(f"PDF reading error: {e}")
+
+        def find_molecule_names(text):
+            candidates = re.findall(r"\b([A-Z][a-z]+[a-z0-9\-() ]{2,})\b", text)
+            filtered = [name for name in candidates if len(name.split()) < 4 and any(c.isdigit() for c in name)]
+            return list(set(filtered))
+
+        molecule_names = find_molecule_names(text)
+
+        if molecule_names:
+            st.success(f"Detected molecule names: {', '.join(molecule_names)}")
+            selected_name = st.selectbox("Select a molecule:", molecule_names)
+
+            if st.button("Fetch Structure from PubChem"):
+                try:
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{selected_name}/property/IsomericSMILES/TXT"
+                    response = requests.get(url)
+                    if response.status_code == 200:
+                        extracted_smiles = response.text.strip()
+                        mol = Chem.MolFromSmiles(extracted_smiles)
+                        mol = Chem.AddHs(mol)
+                        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+                        AllChem.UFFOptimizeMolecule(mol)
+                        mol_block = MolToMolBlock(mol)
+                        st.download_button("Download .mol file", mol_block, file_name=f"{selected_name}.mol")
+                        st.info(f"SMILES used: {extracted_smiles}")
+                        if display_mode == "3D Viewer":
+                            render_3d_molecule(mol)
+                    else:
+                        st.error("Could not fetch SMILES from PubChem.")
+                except Exception as e:
+                    st.error(f"Error fetching structure: {e}")
+        else:
+            st.warning("No molecule names detected in the PDF.")
