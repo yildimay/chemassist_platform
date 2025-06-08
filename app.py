@@ -18,7 +18,7 @@ from modules.gromacs_mdp_generator import (
     generate_npt_mdp,
     generate_md_mdp
 )
-from modules import gromacs_error_fixer_ai
+from modules.gromacs_error_fixer_ai import gromacs_error_fixer_ai
 
 # Sidebar module selection
 selected_module = st.sidebar.radio(
