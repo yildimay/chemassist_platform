@@ -11,19 +11,25 @@ def render_3d_molecule(mol):
     try:
         mol_block = MolToMolBlock(mol).replace("\n", "\\n")
         viewer_html = '''
-        <div style='height: 500px; width: 100%; position: relative;'>
-        <script src='https://3Dmol.csb.pitt.edu/build/3Dmol-min.js'></script>
-        <div id='viewer' style='height: 100%; width: 100%;'></div>
+        <html>
+        <head>
+        <script src="https://3Dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
+        </head>
+        <body>
+        <div id="viewer" style="width: 100%; height: 500px;"></div>
         <script>
-            var viewer = $3Dmol.createViewer("viewer", {backgroundColor: "white"});
+            var viewer = $3Dmol.createViewer("viewer", { backgroundColor: "white" });
             viewer.addModel(""" + mol_block + """, "mol");
-            viewer.setStyle({}, {stick: {}});
+            viewer.setStyle({}, {stick:{}});
             viewer.zoomTo();
             viewer.render();
         </script>
-        </div>
+        </body>
+        </html>
         '''
         components.html(viewer_html, height=500)
+    except Exception as e:
+        st.error(f"Failed to render 3D model: {e}")
     except Exception as e:
         st.error(f"Failed to render 3D model: {e}")
 
