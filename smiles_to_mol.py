@@ -2,6 +2,7 @@
 import streamlit as st
 import io                                     # <── eklendi
 from rdkit import Chem
+import requests 
 from rdkit.Chem import AllChem, MolToMolBlock, Draw
 from rdkit.Chem.rdmolfiles import MolToXYZBlock   # <── eklendi
 import streamlit.components.v1 as components
