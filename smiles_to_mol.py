@@ -1,167 +1,131 @@
 # -*- coding: utf-8 -*-
-"""extract_molecules_from_pdf.py (rev‑2)
+"""
+smiles_to_mol.py
+Streamlit uygulaması
+  • SMILES metnini 2 D / 3 D / XYZ olarak gösterir
+  • PDF yüklenirse gerçek kimyasal isimleri çıkarıp listeler
+     (saf-Python RegEx + PubChem doğrulaması – Python 3.11’de derleme yok)
 
-Robust extraction of *true* chemical names (e.g. Palbociclib, Kaempferol) from
-research‑article PDFs.
-
-Pipeline
-========
-1. **Read PDF → raw text** (PyMuPDF ‑ fast & layout‑agnostic)
-2. **Chemical NER** via *ChemDataExtractor* → set of raw entity strings
-3. Heuristics:   • drop stop‑words (Table, Revised …)  • length > 2  • no digits
-4. *(Optional)* **PubChem sanity‑check** using *pubchempy*; keeps only entities
-   that resolve to at least one PubChem CID (makes list noise‑free but slower).
-5. Return unique names (preserving title‑case).
-
-Usage
------
-```bash
-pip install pymupdf chemdataextractor pubchempy
-python extract_molecules_from_pdf.py my_article.pdf
-```
-
-The function `extract_molecules_from_pdf(file_like)` can be imported directly
-into *smiles_to_mol.py* and connected to a Streamlit file‑uploader.
+requirements.txt  ➜  yalnızca bunlar:
+    streamlit>=1.34.0
+    rdkit-pypi>=2023.9.4
+    pymupdf==1.24.2          # fitz
+    pubchempy==1.0.4
 """
 
-from __future__ import annotations
-
+import streamlit as st
 import io
 import re
-import sys
-from pathlib import Path
-from typing import Iterable, List, Set, Union
+from typing import Iterable, List
 
-import fitz  # PyMuPDF
-from chemdataextractor import Document
+import requests
+from rdkit import Chem
+from rdkit.Chem import AllChem, MolToMolBlock, Draw
+from rdkit.Chem.rdmolfiles import MolToXYZBlock
+import streamlit.components.v1 as components
 
-# PubChem lookup is optional → soft import
-try:
-    import pubchempy as pcp
-except ModuleNotFoundError:  # fallback stub
-    pcp = None  # type: ignore
-
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
-STOP_PATTERNS = re.compile(
-    r"^(table|figure|received|revised|accepted|available|online|science|vertex|"
-    r"explorer|changsha|lianyungang|shelxl|shelxs|cdk|journal|february|october)",
-    re.I,
-)
-NON_WORD = re.compile(r"[^A-Za-z\-]", re.A)
+import fitz                 # PyMuPDF
+import pubchempy as pcp      # PubChem API wrapper
+# ----------------------------------------------------------------------
+# Helper • PDF → kimyasal isimler (saf-Python, 3.11-uyumlu)
+STOP_WORDS = {
+    "table", "figure", "online", "revised", "received",
+    "accepted", "science", "explorer", "vertex"
+}
+RE_CANDIDATE = re.compile(r"\b([A-Z][a-z]{2,}[0-9−\-]*)\b")  # basit kimyasal örüntü
 
 
-def _read_pdf(file_like: Union[str, Path, bytes, io.BytesIO]) -> str:
-    """Return concatenated plain text of every page using PyMuPDF."""
-
-    if isinstance(file_like, (str, Path)):
-        doc = fitz.open(str(file_like))
-    elif isinstance(file_like, (bytes, io.BytesIO)):
-        if isinstance(file_like, bytes):
-            stream = io.BytesIO(file_like)
-        else:
-            stream = file_like
-        stream.seek(0)
-        doc = fitz.open(stream=stream.read(), filetype="pdf")
-    else:
-        raise TypeError("Unsupported file_like type → %r" % type(file_like))
-
-    text_pages = [page.get_text("text") for page in doc]
-    doc.close()
-    return "\n".join(text_pages)
+def _extract_text(pdf_file: io.BufferedReader | io.BytesIO) -> str:
+    "Return raw text concatenated from all pages"
+    with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
+        return "\n".join(page.get_text("text") for page in doc)
 
 
-def _clean_names(raw_names: Iterable[str]) -> List[str]:
-    """Apply regex/length filters and title‑case normalisation."""
-
-    out: List[str] = []
-    seen: Set[str] = set()
-
-    for name in raw_names:
-        name = name.strip().replace("\u00ad", "")  # soft hyphen removal
-        if len(name) < 3:
-            continue
-        if STOP_PATTERNS.search(name):
-            continue
-        if any(ch.isdigit() for ch in name):
-            continue
-        # remove trailing punctuation
-        name = name.rstrip(".,;:()[]{} ")
-        # multiple words? keep up to three tokens (e.g. "L‑proline hydrochloride")
-        tokens = name.split()
-        if len(tokens) > 3:
-            continue
-        cleaned = " ".join(tokens)
-        key = cleaned.lower()
-        if key not in seen:
-            out.append(cleaned)
-            seen.add(key)
-    return out
+def _is_real_molecule(name: str) -> bool:
+    "True if PubChem has at least one record for this common name"
+    try:
+        return bool(pcp.get_compounds(name, "name", record_type="3d"))
+    except Exception:
+        # ağ hatası vs. durumunda false deme – mümkünse tut
+        return False
 
 
-def _pubchem_filter(names: List[str]) -> List[str]:
-    """Return only names that resolve to at least one PubChem CID."""
+def extract_molecules_from_pdf(pdf_file: io.BufferedReader | io.BytesIO) -> List[str]:
+    """Return list of validated chemical names from the given PDF file-like object."""
+    text = _extract_text(pdf_file)
+    candidates = {m.group(1) for m in RE_CANDIDATE.finditer(text)}
+    # kaba kara-liste & uzunluk filtresi
+    filtered = {
+        c for c in candidates
+        if c.lower() not in STOP_WORDS and len(c) <= 30
+    }
+    # PubChem onayı
+    molecules = [n for n in filtered if _is_real_molecule(n)]
+    return sorted(set(molecules), key=str.lower)
+# ----------------------------------------------------------------------
+# RDKit görselleştirme yardımcıları
+def render_2d_molecule(mol):
+    img = Draw.MolToImage(mol, size=(300, 300))
+    st.image(img, use_column_width=False)
 
-    if pcp is None:
-        return names  # pubchempy not installed → skip
 
-    confirmed: List[str] = []
-    for nm in names:
-        try:
-            if pcp.get_compounds(nm, "name", first=True):
-                confirmed.append(nm)
-        except Exception:
-            # network error / timeout → keep candidate (fail‑open)
-            confirmed.append(nm)
-    return confirmed
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-def extract_molecules_from_pdf(
-    file_like: Union[str, Path, bytes, io.BytesIO],
-    *,
-    validate_pubchem: bool = True,
-    max_names: int | None = 30,
-) -> List[str]:
-    """Return a de‑duplicated list of chemical names detected in *file_like*.
-
-    Parameters
-    ----------
-    file_like : path/bytes/BytesIO
-        PDF file content or path.
-    validate_pubchem : bool, default True
-        If **True** each name is looked‑up via PubChem to weed out false positives.
-    max_names : int | None
-        Truncate list after *max_names*; ``None`` → no limit.
+def render_3d_molecule(mol):
+    mol_block = MolToMolBlock(mol)
+    html = f"""
+        <div id="viewer" style="width:100%;height:400px;"></div>
+        <script src="https://3Dmol.org/build/3Dmol.js"></script>
+        <script>
+          const viewer = $3Dmol.createViewer(
+              "viewer", {{backgroundColor: "white"}}
+          );
+          viewer.addModel(`{mol_block}`, "mol");
+          viewer.setStyle({{}}, {{stick:{{}}}});
+          viewer.zoomTo();
+          viewer.render();
+        </script>
     """
+    components.html(html, height=420, scrolling=False)
+# ----------------------------------------------------------------------
+# Streamlit UI
+def main():
+    st.title("SMILES ↔ Molecule & PDF Molecule Extractor")
 
-    text = _read_pdf(file_like)
-    # Chemical NER via ChemDataExtractor
-    doc = Document(text)
-    raw_names = {cem.text for cem in doc.cems if cem.text}
+    # ==== PDF Bölümü ====
+    st.subheader("📄  PDF’den molekül isimleri çek")
+    pdf_bytes = st.file_uploader("Araştırma makalesi PDF’i seç (isteğe bağlı)", type=["pdf"])
+    if st.button("Molekülleri bul") and pdf_bytes:
+        with st.spinner("PDF taranıyor…"):
+            names = extract_molecules_from_pdf(pdf_bytes)
+        if names:
+            st.success(f"Bulunan moleküller ({len(names)}):")
+            st.write(", ".join(names))
+        else:
+            st.warning("Geçerli kimyasal isim bulunamadı.")
+    st.markdown("---")
 
-    names = _clean_names(raw_names)
-    if validate_pubchem:
-        names = _pubchem_filter(names)
+    # ==== SMILES Görselleştirme ====
+    st.subheader("🧪  SMILES ➜ MOL görselleştir")
+    smi = st.text_input("SMILES:", "C1=CC=CC=C1")  # varsayılan benzen
+    mode = st.radio("Görüntü Modu", ("2D", "3D", "XYZ koordinatları"))
 
-    return names if max_names is None else names[: max_names]
+    if st.button("Göster") and smi:
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                st.error("❌ Geçersiz SMILES")
+                return
+            if mode != "2D":
+                AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+                AllChem.UFFOptimizeMolecule(mol)
 
-
-# ---------------------------------------------------------------------------
-# CLI for quick testing
-# ---------------------------------------------------------------------------
+            if mode == "2D":
+                render_2d_molecule(mol)
+            elif mode == "3D":
+                render_3d_molecule(mol)
+            else:
+                st.code(MolToXYZBlock(mol), language="xyz")
+        except Exception as exc:
+            st.error(f"⚠️ {mode} gösterimi başarısız: {exc}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("Usage: python extract_molecules_from_pdf.py <article.pdf>")
-
-    pdf_path = sys.argv[1]
-    print("Parsing:", pdf_path)
-    cems = extract_molecules_from_pdf(pdf_path)
-    print("\nDetected molecules (PubChem‑confirmed):")
-    for i, cem in enumerate(cems, 1):
-        print(f"{i:2d}. {cem}")
+    main()
