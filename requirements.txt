@@ -10,3 +10,5 @@ PyPDF2
 pytesseract
 openai>=0.27.0
 pymupdf==1.24.2  
+chemdataextractor==1.5.0
+pubchempy==1.0.4
