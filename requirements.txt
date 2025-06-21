@@ -4,7 +4,6 @@ pillow
 requests
 python-dotenv
 ipywidgets
-ipython-genutils
 numpy
 PyPDF2
 pytesseract
