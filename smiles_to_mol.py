@@ -1,45 +1,66 @@
+# smiles_to_mol.py  --- eksik import ve yardımcı fonksiyon eklendi
 import streamlit as st
 from rdkit import Chem
 from rdkit.Chem import AllChem, MolToMolBlock
+from rdkit.Chem import Draw             # 2D çizim için eklendi
 import streamlit.components.v1 as components
 
+# ---------- YARDIMCI GÖRSELLEŞTİRME FONKSİYONLARI ----------
+def render_2d_molecule(mol):
+    """RDKit 2D çizim çıktısını Streamlit'e gönderir."""
+    img = Draw.MolToImage(mol, size=(300, 300))
+    st.image(img, use_column_width=False)
 
-def smiles_ui():
-    st.title("SMILES ➜ 3D Görselleştirme")
-
-    smi = st.text_input("SMILES gir:", "c1ccccc1")  # örnek: benzen
-    if not smi:
-        st.stop()
-
-    try:
-        mol = Chem.MolFromSmiles(smi)
-        if mol is None:
-            st.error("Geçersiz SMILES!")
-            st.stop()
-
-        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-        AllChem.UFFOptimizeMolecule(mol)
-        mol_block = MolToMolBlock(mol)
-
-        html = """
-        <div id="viewer" style="width:100%%;height:400px;"></div>
+def render_3d_molecule(mol):
+    """py3Dmol + 3Dmol.js ile 3D gösterim yapar (HTML/JS gömülü)."""
+    mol_block = MolToMolBlock(mol)
+    html = f"""
+        <div id="viewer" style="width:100%;height:400px;"></div>
         <script src="https://3Dmol.org/build/3Dmol.js"></script>
         <script>
           const viewer = $3Dmol.createViewer(
-              "viewer", {backgroundColor: "white"}
+              "viewer", {{backgroundColor: "white"}}
           );
-          viewer.addModel(`%s`, "mol");
-          viewer.setStyle({}, {stick:{}});
+          viewer.addModel(`{mol_block}`, "mol");
+          viewer.setStyle({{}}, {{stick:{{}}}});
           viewer.zoomTo();
           viewer.render();
         </script>
-        """ % mol_block   # sadece %s ile mol_block ekledik
+    """
+    components.html(html, height=420, scrolling=False)
 
-        components.html(html, height=420, scrolling=False)
+# ---------- ANA UI ----------
+def smiles_ui():
+    st.title("SMILES ➜ MOL Dönüştürücü")
+    smi = st.text_input("Enter SMILES string:", "C1=CC=CC=C1")
 
-    except Exception as e:
-        st.exception(e)
+    display_mode = st.radio(
+        "Display Mode", ["2D Viewer", "3D Viewer", "XYZ Coordinates"]
+    )
 
+    if st.button("Convert to MOL") and smi:
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                st.error("❌ Geçersiz SMILES girdisi")
+                return
+
+            # 3D gereken durumlarda koordinat ekle + opsiyonel UFF optimizasyon
+            if display_mode != "2D Viewer":
+                AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+                AllChem.UFFOptimizeMolecule(mol)
+
+            # Görselleştir
+            if display_mode == "2D Viewer":
+                render_2d_molecule(mol)
+            elif display_mode == "3D Viewer":
+                render_3d_molecule(mol)
+            else:  # XYZ Coordinates
+                xyz_block = Chem.MolToXYZBlock(mol)
+                st.code(xyz_block, language="xyz")
+
+        except Exception as e:
+            st.error(f"⚠️ {display_mode} failed: {e}")
 
 if __name__ == "__main__":
     smiles_ui()
