@@ -1,5 +1,5 @@
-streamlit>=1.34.0
-rdkit-pypi==2022.9.5
+streamlit
+rdkit-pypi
 pillow
 requests
 python-dotenv
@@ -9,5 +9,6 @@ numpy
 PyPDF2
 pytesseract
 openai>=0.27.0
-pymupdf==1.24.2  
+pymupdf==1.24.2
+chemdataextractor2
 pubchempy==1.0.4
