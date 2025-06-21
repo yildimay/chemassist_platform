@@ -3,6 +3,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, MolToMolBlock
 import streamlit.components.v1 as components
 
+
 def smiles_ui():
     st.title("SMILES ➜ 3D Görselleştirme")
 
@@ -10,31 +11,39 @@ def smiles_ui():
     if not smi:
         st.stop()
 
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        st.error("Geçersiz SMILES!")
-        st.stop()
+    try:
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            st.error("Geçersiz SMILES!")
+            st.stop()
 
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    molblock = MolToMolBlock(mol)
+        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+        AllChem.UFFOptimizeMolecule(mol)
+        mol_block = MolToMolBlock(mol)
 
-    html = f"""
-    <div id="viewer" style="width:100%;height:400px;"></div>
-    <script src="https://3Dmol.org/build/3Dmol.js"></script>
-    <script>
-      const viewer = $3Dmol.createViewer(
-          "viewer", {{ backgroundColor: "white" }}
-      );
-      viewer.addModel(`{molblock}`, "mol");
-      viewer.setStyle({{}}, {{stick:{{}}}});
-      viewer.zoomTo();
-      viewer.render();
-    </script>
-    """
-    components.html(html, height=420, scrolling=False)
+        html = """
+        <div id="viewer" style="width:100%%;height:400px;"></div>
+        <script src="https://3Dmol.org/build/3Dmol.js"></script>
+        <script>
+          const viewer = $3Dmol.createViewer(
+              "viewer", {backgroundColor: "white"}
+          );
+          viewer.addModel(`%s`, "mol");
+          viewer.setStyle({}, {stick:{}});
+          viewer.zoomTo();
+          viewer.render();
+        </script>
+        """ % mol_block   # sadece %s ile mol_block ekledik
+
+        components.html(html, height=420, scrolling=False)
+
     except Exception as e:
-        st.error(f"Failed to render 3D model: {e}")
+        st.exception(e)
 
+
+if __name__ == "__main__":
+    smiles_ui()
+    
 def smiles_ui():
     st.title("🧬 SMILES to MOL Converter")
 
