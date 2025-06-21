@@ -34,6 +34,9 @@ STOP_WORDS = {
 }
 RE_CANDIDATE = re.compile(r"\b([A-Z][a-z]{2,}[0-9−\-]*)\b")  # basit kimyasal örüntü
 
+python def smiles_ui():    
+  main()
+
 
 def _extract_text(pdf_file: io.BufferedReader | io.BytesIO) -> str:
     "Return raw text concatenated from all pages"
