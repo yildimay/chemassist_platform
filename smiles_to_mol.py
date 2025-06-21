@@ -1,8 +1,9 @@
-# smiles_to_mol.py  --- eksik import ve yardımcı fonksiyon eklendi
+# --- import section ---
 import streamlit as st
+import io                                     # <── eklendi
 from rdkit import Chem
-from rdkit.Chem import AllChem, MolToMolBlock
-from rdkit.Chem import Draw             # 2D çizim için eklendi
+from rdkit.Chem import AllChem, MolToMolBlock, Draw
+from rdkit.Chem.rdmolfiles import MolToXYZBlock   # <── eklendi
 import streamlit.components.v1 as components
 
 # ---------- YARDIMCI GÖRSELLEŞTİRME FONKSİYONLARI ----------
@@ -100,8 +101,8 @@ def smiles_ui():
                     raise ValueError("3D optimization with UFF and MMFF failed.")
 
             if display_mode == "XYZ Coordinates":
-                xyz_data = MolToXYZBlock(mol)
-                st.text_area("XYZ Coordinates", value=xyz_data, height=300)
+                xyz_block = MolToXYZBlock(mol)
+                st.code(xyz_block, language="xyz")
             elif display_mode == "2D Viewer":
                 mol_2d = Chem.MolFromSmiles(smiles)
                 img = Draw.MolToImage(mol_2d, size=(400, 400))
