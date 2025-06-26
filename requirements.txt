@@ -1,5 +1,5 @@
 streamlit
-rdkit-pypi>=2023.9.4
+rdkit-pypi
 pillow
 requests
 python-dotenv
