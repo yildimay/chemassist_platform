@@ -1,4 +1,4 @@
-'''# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 smiles_to_mol.py
 Streamlit uygulaması
@@ -132,4 +132,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
