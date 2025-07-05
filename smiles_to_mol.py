@@ -12,7 +12,7 @@ requirements.txt  ➜  yalnızca bunlar:
     pymupdf==1.24.2          # fitz
     pubchempy==1.0.4
 """
-
+RE_CANDIDATE = re.compile(r'\\b([A-Z][a-z]+[a-z0-9\\-() ]{2,})\\b')
 import streamlit as st
 import io
 import re
