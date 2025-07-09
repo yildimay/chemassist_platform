@@ -129,3 +129,17 @@ def smiles_ui():
                     st.error(f"Error fetching structure: {e}")
         else:
             st.warning("No molecule names detected in the PDF.")
+
+
+
+import streamlit as st
+
+def gromacs_error_fixer_ai_ui():
+    st.header("GROMACS Error Fixer AI")
+    st.write("Upload your GROMACS .log or .out file to begin analysis.")
+    uploaded_file = st.file_uploader("Upload GROMACS log/out file", type=["log", "out"])
+    if uploaded_file:
+        st.success("File uploaded successfully.")
+        # Placeholder for error analysis and fix suggestion
+        st.write("Analyzing the file...")
+        # Add your AI integration logic here
