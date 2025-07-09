@@ -1,6 +1,6 @@
 # gromacs_fixer_ui.py
 
-def gromacs_fixer_ui():
+def gromacs_fixer_ai_ui():
     import streamlit as st
     from PIL import Image
     import pytesseract
