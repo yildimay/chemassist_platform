@@ -14,7 +14,7 @@ requirements.txt  ➜  yalnızca bunlar:
 """
 import re
 
-RE_CANDIDATE = re.compile(r'\b([A-Z][a-z]+[a-z0-9() \-]{2,})\b')
+RE_CANDIDATE = re.compile(r'\\b([A-Z][a-z]+[a-z0-9\\-() ]{2,})\\b')
 import streamlit as st
 import io
 import re
@@ -134,3 +134,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# 📄 PDF'den Molekül Seç ve Modelle - entegre modül
+with st.expander("📄 PDF'den Molekül Seç ve Modelle"):
+    example_molecules = ["Paracetamol", "Imatinib", "Quantum", "The", "Water", "Diclofenac"]
+    stopwords = {"the", "water", "quantum", "access", "open", "clean", "all"}
+
+    valid_mols = [m for m in example_molecules if m.lower() not in stopwords]
+    st.write("**PDF'den çekilen moleküller:**")
+    for mol in valid_mols:
+        col1, col2 = st.columns([4, 1])
+        col1.markdown(f"- **{mol}**")
+        if col2.button("Modelle", key=f"btn_{mol}"):
+            results = pcp.get_compounds(mol, 'name')
+            if results:
+                compound = results[0]
+                st.session_state["selected_smiles"] = compound.isomeric_smiles
+                st.session_state["selected_name"] = mol
+
+    if "selected_smiles" in st.session_state:
+        st.subheader(f"🧪 {st.session_state['selected_name']} Molekülü")
+        mol = Chem.MolFromSmiles(st.session_state["selected_smiles"])
+        if mol:
+            AllChem.Compute2DCoords(mol)
+            st.image(Draw.MolToImage(mol, size=(300, 300)))
+            st.code(st.session_state["selected_smiles"], language="smiles")
+        else:
+            st.error("Molekül görselleştirilemedi.")
