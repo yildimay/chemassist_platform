@@ -14,7 +14,7 @@ requirements.txt  ➜  yalnızca bunlar:
 """
 import re
 
-RE_CANDIDATE = re.compile(r'\\b([A-Z][a-z]+[a-z0-9\\-() ]{2,})\\b')
+RE_CANDIDATE = re.compile(r'\b([A-Z][a-z]+[a-z0-9() \-]{2,})\b')
 import streamlit as st
 import io
 import re
